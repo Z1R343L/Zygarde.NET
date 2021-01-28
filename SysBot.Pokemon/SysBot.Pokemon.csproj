@@ -8,6 +8,14 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <None Remove="Helpers\DexFlavor.txt" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Helpers\DexFlavor.txt" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="PKHeX.Core" Version="21.1.31" />
     <ProjectReference Include="..\SysBot.Base\SysBot.Base.csproj" />
   </ItemGroup>
