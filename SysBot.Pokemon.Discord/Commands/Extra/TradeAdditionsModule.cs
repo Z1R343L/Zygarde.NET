@@ -207,7 +207,8 @@ namespace SysBot.Pokemon.Discord
             {
                 var speciesName = SpeciesName.GetSpeciesNameGeneration(TCRng.SpeciesRNG, 2, 8);
                 var mgRng = MGRngEvent == default ? MysteryGiftRng() : MGRngEvent;
-                if ((TradeExtensions.CherishOnly.Contains(TCRng.SpeciesRNG) || TCRng.CherishRng >= 100 - Info.Hub.Config.TradeCord.CherishRate || MGRngEvent != default) && mgRng != default)
+                bool melmetalHack = TCRng.SpeciesRNG == (int)Species.Melmetal && TCRng.GmaxRNG >= 100 - Info.Hub.Config.TradeCord.GmaxRate;
+                if ((TradeExtensions.CherishOnly.Contains(TCRng.SpeciesRNG) || TCRng.CherishRng >= 100 - Info.Hub.Config.TradeCord.CherishRate || MGRngEvent != default || melmetalHack) && mgRng != default)
                 {
                     TCRng.CatchPKM = TradeExtensions.CherishHandler(mgRng);
                     TradeExtensions.LegalityAttempt(TCRng.CatchPKM);
@@ -272,8 +273,9 @@ namespace SysBot.Pokemon.Discord
                 return;
             }
 
+            TCInfo.TradedPKM = match;
+            TCInfo.Catches.Remove(match);
             TradeExtensions.TradeCordPath.Add(match.Path);
-            TCInfo.TradedPath = Path.Combine($"TradeCord\\Backup\\{TCInfo.UserID}", match.Path.Split('\\')[2]);
             UpdateUserInfo(TCInfo);
             var sig = Context.User.GetFavor();
             await Context.AddToQueueAsync(code, Context.User.Username, sig, (PK8)pkm, PokeRoutineType.TradeCord, PokeTradeType.TradeCord).ConfigureAwait(false);
@@ -370,7 +372,7 @@ namespace SysBot.Pokemon.Discord
                 return;
             }
 
-            bool canGmax = new ShowdownSet(ShowdownSet.GetShowdownText(pkm)).CanGigantamax;
+            bool canGmax = new ShowdownSet(ShowdownParsing.GetShowdownText(pkm)).CanGigantamax;
             var pokeImg = PokeImg(pkm, canGmax, pkm.Species == (int)Species.Alcremie ? pkm.Data[0xE4] : 0);
             var embed = new EmbedBuilder { Color = pkm.IsShiny ? Color.Blue : Color.DarkBlue, ThumbnailUrl = pokeImg }.WithFooter(x => { x.Text = $"\n\n{TradeExtensions.DexFlavor(pkm.Species)}"; x.IconUrl = "https://i.imgur.com/nXNBrlr.png"; });
             var name = $"{Context.User.Username}'s {(match.Shiny ? "★" : "")}{match.Species}{match.Form} [ID: {match.ID}]";
@@ -807,7 +809,7 @@ namespace SysBot.Pokemon.Discord
             var dir = Path.Combine("TradeCord", subfolder);
             Directory.CreateDirectory(dir);
             var speciesName = SpeciesName.GetSpeciesNameGeneration(pkm.Species, 2, 8);
-            var form = TradeExtensions.FormOutput(pkm.Species, pkm.AltForm, out _);
+            var form = TradeExtensions.FormOutput(pkm.Species, pkm.Form, out _);
             if (speciesName.Contains("Nidoran"))
             {
                 speciesName = speciesName.Remove(speciesName.Length - 1);
@@ -915,18 +917,18 @@ namespace SysBot.Pokemon.Discord
                                 if (!dex.Contains(pkm.Species))
                                     dex.Add(pkm.Species);
 
-                                var form = TradeExtensions.FormOutput(pkm.Species, pkm.AltForm, out _);
+                                var form = TradeExtensions.FormOutput(pkm.Species, pkm.Form, out _);
                                 catches.Add(new TradeExtensions.Catch { ID = id, Ball = $"{(Ball)pkm.Ball}", Egg = pkm.IsEgg, Form = form, Shiny = pkm.IsShiny, Species = $"{SpeciesName.GetSpeciesNameGeneration(pkm.Species, 2, 8)}", Path = file });
                                 if (dc1 && id1 == id)
-                                    dcPkm1 = new TradeExtensions.Daycare1 { Ball = pkm.Ball, Form = TradeExtensions.FormOutput(pkm.Species, pkm.AltForm, out _), Species = pkm.Species, Shiny = pkm.IsShiny, ID = id1 };
+                                    dcPkm1 = new TradeExtensions.Daycare1 { Ball = pkm.Ball, Form = TradeExtensions.FormOutput(pkm.Species, pkm.Form, out _), Species = pkm.Species, Shiny = pkm.IsShiny, ID = id1 };
                                 else if (dc2 && id2 == id)
-                                    dcPkm2 = new TradeExtensions.Daycare2 { Ball = pkm.Ball, Form = TradeExtensions.FormOutput(pkm.Species, pkm.AltForm, out _), Species = pkm.Species, Shiny = pkm.IsShiny, ID = id2 };
+                                    dcPkm2 = new TradeExtensions.Daycare2 { Ball = pkm.Ball, Form = TradeExtensions.FormOutput(pkm.Species, pkm.Form, out _), Species = pkm.Species, Shiny = pkm.IsShiny, ID = id2 };
                             }
 
                             jobject.Users.Add(new TradeExtensions.TCUserInfo
                             {
                                 UserID = ulong.Parse(userid),
-                                TradedPath = "",
+                                TradedPKM = null,
                                 CatchCount = int.TryParse(info[0], out int count) ? count : 0,
                                 Daycare1 = dc1 ? dcPkm1 : new TradeExtensions.Daycare1 { },
                                 Daycare2 = dc2 ? dcPkm2 : new TradeExtensions.Daycare2 { },
@@ -954,19 +956,14 @@ namespace SysBot.Pokemon.Discord
             }
 
             TCInfo = GetUserInfo(Context.User.Id);
-            if (TCInfo.TradedPath != "")
+            if (TCInfo.TradedPKM != null && TradeExtensions.TradeCordPath.FirstOrDefault(x => x.Contains(TCInfo.UserID.ToString())) == default)
             {
-                if (File.Exists(TCInfo.TradedPath))
-                {
-                    TCInfo.Catches.Remove(TCInfo.Catches.Find(x => Path.Combine($"TradeCord\\Backup\\{TCInfo.UserID}", x.Path.Split('\\')[2]) == TCInfo.TradedPath));
-                    TCInfo.TradedPath = "";
-                    UpdateUserInfo(TCInfo);
-                }
-                else
-                {
-                    TCInfo.TradedPath = "";
-                    UpdateUserInfo(TCInfo);
-                }
+                var tradedPath = Path.Combine($"TradeCord\\Backup\\{TCInfo.UserID}", TCInfo.TradedPKM.Path.Split('\\')[2]);
+                if (!File.Exists(tradedPath))
+                    TCInfo.Catches.Add(TCInfo.TradedPKM);
+
+                TCInfo.TradedPKM = null;
+                UpdateUserInfo(TCInfo);
             }
         }
 
@@ -1119,7 +1116,7 @@ namespace SysBot.Pokemon.Discord
             bool md = false;
             bool fd = false;
             var baseLink = "https://projectpokemon.org/images/sprites-models/homeimg/poke_capture_0001_000_mf_n_00000000_f_n.png".Split('_');
-            if (TradeExtensions.GenderDependent.Contains(pkm.Species) && !canGmax && pkm.AltForm == 0)
+            if (TradeExtensions.GenderDependent.Contains(pkm.Species) && !canGmax && pkm.Form == 0)
             {
                 if (pkm.Gender == 0)
                     md = true;
@@ -1127,7 +1124,7 @@ namespace SysBot.Pokemon.Discord
             }
 
             baseLink[2] = pkm.Species < 10 ? $"000{pkm.Species}" : pkm.Species < 100 && pkm.Species > 9 ? $"00{pkm.Species}" : $"0{pkm.Species}";
-            baseLink[3] = pkm.AltForm < 10 ? $"00{pkm.AltForm}" : $"0{pkm.AltForm}";
+            baseLink[3] = pkm.Form < 10 ? $"00{pkm.Form}" : $"0{pkm.Form}";
             baseLink[4] = pkm.PersonalInfo.OnlyFemale ? "fo" : pkm.PersonalInfo.OnlyMale ? "mo" : pkm.PersonalInfo.Genderless ? "uk" : fd ? "fd" : md ? "md" : "mf";
             baseLink[5] = canGmax ? "g" : "n";
             baseLink[6] = "0000000" + (pkm.Species == (int)Species.Alcremie ? alcremieDeco : 0);
@@ -1190,7 +1187,7 @@ namespace SysBot.Pokemon.Discord
                 trainerInfo.RemoveAll(x => x.Contains("Language"));
 
             var set = new ShowdownSet($"{speciesName}{(formHack != "" ? $"-{formHack}" : "")}{ballRng}{shinyType}\n{string.Join("\n", trainerInfo)}");
-            if (set.CanToggleGigantamax(set.Species, set.FormIndex) && TCRng.GmaxRNG >= 100 - Info.Hub.Config.TradeCord.GmaxRate)
+            if (set.CanToggleGigantamax(set.Species, set.Form) && TCRng.GmaxRNG >= 100 - Info.Hub.Config.TradeCord.GmaxRate)
                 set.CanGigantamax = true;
 
             return set;
@@ -1206,7 +1203,7 @@ namespace SysBot.Pokemon.Discord
 
             TCRng.EggPKM = (PK8)TradeExtensions.EggRngRoutine(TCInfo, trainerInfo, evo1, evo2, star, square);
             var eggSpeciesName = SpeciesName.GetSpeciesNameGeneration(TCRng.EggPKM.Species, 2, 8);
-            var eggForm = TradeExtensions.FormOutput(TCRng.EggPKM.Species, TCRng.EggPKM.AltForm, out _);
+            var eggForm = TradeExtensions.FormOutput(TCRng.EggPKM.Species, TCRng.EggPKM.Form, out _);
             var laEgg = new LegalityAnalysis(TCRng.EggPKM);
             if (!(TCRng.EggPKM is PK8) || !laEgg.Valid || !TCRng.EggPKM.IsEgg)
             {
@@ -1243,13 +1240,13 @@ namespace SysBot.Pokemon.Discord
                     var temp = (PK8)TradeCordPKM(TCRng.SpeciesRNG, out _);
                     type = GameInfo.Strings.Types[temp.PersonalInfo.Type1] == Info.Hub.Config.TradeCord.PokeEventType.ToString() ? GameInfo.Strings.Types[temp.PersonalInfo.Type1] : GameInfo.Strings.Types[temp.PersonalInfo.Type2] == Info.Hub.Config.TradeCord.PokeEventType.ToString() ? GameInfo.Strings.Types[temp.PersonalInfo.Type2] : "";
                     EventPokeType = type != "" ? "Base" : "";
-                    if (type == "" && temp.PersonalInfo.FormeCount > 1)
+                    if (type == "" && temp.PersonalInfo.FormCount > 1)
                     {
-                        for (int i = 1; i < temp.PersonalInfo.FormeCount; i++)
+                        for (int i = 1; i < temp.PersonalInfo.FormCount; i++)
                         {
-                            temp.AltForm = i;
+                            temp.Form = i;
                             type = GameInfo.Strings.Types[temp.PersonalInfo.Type1] == Info.Hub.Config.TradeCord.PokeEventType.ToString() ? GameInfo.Strings.Types[temp.PersonalInfo.Type1] : GameInfo.Strings.Types[temp.PersonalInfo.Type2] == Info.Hub.Config.TradeCord.PokeEventType.ToString() ? GameInfo.Strings.Types[temp.PersonalInfo.Type2] : "";
-                            EventPokeType = type != "" ? $"{temp.AltForm}" : "";
+                            EventPokeType = type != "" ? $"{temp.Form}" : "";
                             if (EventPokeType != "")
                                 break;
                         }
@@ -1271,16 +1268,14 @@ namespace SysBot.Pokemon.Discord
         private MysteryGift? MysteryGiftRng()
         {
             var mg = EncounterEvent.GetAllEvents().Where(x => x.Species == TCRng.SpeciesRNG).ToList();
+            mg.RemoveAll(x => x.GetDescription().Count() < 3);
             MysteryGift? mgRng = default;
             if (mg.Count > 0)
             {
-                for (int i = 0; i < mg.Count; i++)
-                    mg.RemoveAll(x => x.GetDescription().Count() < 3);
-
                 if (TCRng.ShinyRNG >= 100 - Info.Hub.Config.TradeCord.SquareShinyRate || TCRng.ShinyRNG >= 100 - Info.Hub.Config.TradeCord.StarShinyRate)
                 {
                     var mgSh = mg.FindAll(x => x.IsShiny);
-                    mgRng = mgSh.Count > 0 ? mgSh.ElementAt(TradeExtensions.Random.Next(mgSh.Count)) : mgRng;
+                    mgRng = mgSh.Count > 0 ? mgSh.ElementAt(TradeExtensions.Random.Next(mgSh.Count)) : mg.ElementAt(TradeExtensions.Random.Next(mg.Count));
                 }
                 else mgRng = mg.ElementAt(TradeExtensions.Random.Next(mg.Count));
             }
@@ -1308,7 +1303,7 @@ namespace SysBot.Pokemon.Discord
             TCInfo.CatchCount++;
             TCRng.CatchPKM.ResetPartyStats();
             TradeCordDump(TCInfo.UserID.ToString(), TCRng.CatchPKM, out int index);
-            var form = nidoranGender != string.Empty ? nidoranGender : TradeExtensions.FormOutput(TCRng.CatchPKM.Species, TCRng.CatchPKM.AltForm, out _);
+            var form = nidoranGender != string.Empty ? nidoranGender : TradeExtensions.FormOutput(TCRng.CatchPKM.Species, TCRng.CatchPKM.Form, out _);
             var pokeImg = PokeImg(TCRng.CatchPKM, TCRng.CatchPKM.CanGigantamax, TCRng.CatchPKM.Species == (int)Species.Alcremie ? TCRng.CatchPKM.Data[0xE4] : 0);
             var ballImg = $"https://serebii.net/itemdex/sprites/pgl/" + $"{(Ball)TCRng.CatchPKM.Ball}ball".ToLower() + ".png";
             var embed = new EmbedBuilder { Color = (TCRng.CatchPKM.IsShiny && TCRng.CatchPKM.Ball == 16) || TCRng.CatchPKM.ShinyXor == 0 ? Color.Gold : TCRng.CatchPKM.ShinyXor <= 16 ? Color.LightOrange : Color.Teal, ImageUrl = pokeImg, ThumbnailUrl = ballImg };

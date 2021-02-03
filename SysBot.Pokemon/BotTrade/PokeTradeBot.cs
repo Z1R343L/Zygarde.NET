@@ -307,12 +307,12 @@ namespace SysBot.Pokemon
                     if (clone.FatefulEncounter)
                     {
                         clone.SetDefaultNickname(laInit);
-                        var mg = EncounterEvent.GetAllEvents().Where(x => x.Species == clone.Species && x.Form == clone.AltForm && x.IsShiny == clone.IsShiny && x.OT_Name == clone.OT_Name).ToList();
+                        var mg = EncounterEvent.GetAllEvents().Where(x => x.Species == clone.Species && x.Form == clone.Form && x.IsShiny == clone.IsShiny && x.OT_Name == clone.OT_Name).ToList();
                         if (mg.Count > 0)
                             clone = TradeExtensions.CherishHandler(mg.First());
-                        else clone = (PK8)AutoLegalityWrapper.GetTrainerInfo(8).GetLegal(AutoLegalityWrapper.GetTemplate(new ShowdownSet(ShowdownSet.GetShowdownText(clone) + extraInfo)), out _);
+                        else clone = (PK8)AutoLegalityWrapper.GetTrainerInfo(8).GetLegal(AutoLegalityWrapper.GetTemplate(new ShowdownSet(ShowdownParsing.GetShowdownText(clone) + extraInfo)), out _);
                     }
-                    else clone = (PK8)AutoLegalityWrapper.GetTrainerInfo(8).GetLegal(AutoLegalityWrapper.GetTemplate(new ShowdownSet(ShowdownSet.GetShowdownText(clone) + extraInfo)), out _);
+                    else clone = (PK8)AutoLegalityWrapper.GetTrainerInfo(8).GetLegal(AutoLegalityWrapper.GetTemplate(new ShowdownSet(ShowdownParsing.GetShowdownText(clone) + extraInfo)), out _);
                     var laRegen = new LegalityAnalysis(clone);
                     if (laRegen.Valid)
                         poke.SendNotification(this, $"```fix\nRegenerated and legalized your {(Species)clone.Species}!```");
