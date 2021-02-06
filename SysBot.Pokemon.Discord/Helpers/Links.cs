@@ -32,7 +32,7 @@ namespace SysBot.Pokemon.Discord.Helpers
 
         public static string tc_Baseurl()
         {
-            string tc_baseurl = "http://cloud7827177.nitrado.cloud:8000/sprites/tradecord/custom/v10/poke_capture_0001_000_mf_n_00000000_f_n.png";
+            string tc_baseurl = "http://cloud7827177.nitrado.cloud:8000/sprites/tradecord/custom/v11/poke_capture_0001_000_mf_n_00000000_f_n.png";
             return tc_baseurl;
         }
     }
