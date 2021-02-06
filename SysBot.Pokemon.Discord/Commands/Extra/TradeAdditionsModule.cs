@@ -186,7 +186,7 @@ namespace SysBot.Pokemon.Discord
                 var embedTime = new EmbedBuilder
                 {
                     Author = authorTime,
-                    Title = $"Please try again in {(timeRemaining.Seconds < 1 ? 1 : timeRemaining.Seconds):N0} {(_ = timeRemaining.Seconds > 1 ? "seconds" : "second")}!",
+                    Description = $"Please try again in {(timeRemaining.Seconds < 1 ? 1 : timeRemaining.Seconds):N0} {(_ = timeRemaining.Seconds > 1 ? "seconds" : "second")}!",
                     Color = Colors.Main(),
                 };
 
@@ -445,7 +445,7 @@ namespace SysBot.Pokemon.Discord
             var embed = new EmbedBuilder
             {
                 Author = author,
-                Title = species == "" ? "Every non-shiny Pokémon was released, excluding Ditto, favorites, events, and those in daycare." : $"Every {(species.ToLower() == "shiny" ? "shiny Pokémon" : species.ToLower() == "cherish" ? "event Pokémon" : $"non-shiny {species}")} was released, excluding favorites{(species.ToLower() == "cherish" ? "" : ", events,")} and those in daycare.",
+                Description = species == "" ? "Every non-shiny Pokémon was released, excluding Ditto, favorites, events, and those in daycare." : $"Every {(species.ToLower() == "shiny" ? "shiny Pokémon" : species.ToLower() == "cherish" ? "event Pokémon" : $"non-shiny {species}")} was released, excluding favorites{(species.ToLower() == "cherish" ? "" : ", events,")} and those in daycare.",
                 Color = Colors.Main()
             };
 
@@ -488,7 +488,7 @@ namespace SysBot.Pokemon.Discord
             var embed = new EmbedBuilder
             { 
                 Author = author,
-                Title = $"You release your {(match.Shiny ? "★" : "")}{match.Species}{match.Form}.",
+                Description = $"You release your {(match.Shiny ? "★" : "")}{match.Species}{match.Form}.",
                 Color = Colors.Main()
             };
 
@@ -628,7 +628,7 @@ namespace SysBot.Pokemon.Discord
             var embed = new EmbedBuilder
             {
                 Author = author,
-                Title = deposit && match != null ? $"Deposited your {(match.Shiny ? "★" : "")}{match.Species}{match.Form}({match.Ball}) to daycare!" : $"You withdrew your {speciesString} from the daycare.",
+                Description = deposit && match != null ? $"Deposited your {(match.Shiny ? "★" : "")}{match.Species}{match.Form}({match.Ball}) to daycare!" : $"You withdrew your {speciesString} from the daycare.",
                 Color = Colors.Main() 
             };
 
@@ -691,7 +691,7 @@ namespace SysBot.Pokemon.Discord
             var embed = new EmbedBuilder
             {
                 Author = author,
-                Title = $"You gifted your {(match.Shiny ? "★" : "")}{match.Species}{match.Form} to {Context.Message.MentionedUsers.First().Username}.",
+                Description = $"You gifted your {(match.Shiny ? "★" : "")}{match.Species}{match.Form} to {Context.Message.MentionedUsers.First().Username}.",
                 Color = Colors.Gift() 
             };
 
@@ -780,7 +780,7 @@ namespace SysBot.Pokemon.Discord
             var embed = new EmbedBuilder
             {
                 Author = author,
-                Title = $"\nYou've set your trainer info as the following: \n**OT:** {TCInfo.OTName}\n**OTGender:** {TCInfo.OTGender}\n**TID:** {TCInfo.TID}\n**SID:** {TCInfo.SID}\n**Language:** {TCInfo.Language}",
+                Description = $"\nYou've set your trainer info as the following: \n**OT:** {TCInfo.OTName}\n**OTGender:** {TCInfo.OTGender}\n**TID:** {TCInfo.TID}\n**SID:** {TCInfo.SID}\n**Language:** {TCInfo.Language}",
                 Color = Colors.Main()
             };
 
@@ -804,7 +804,7 @@ namespace SysBot.Pokemon.Discord
             var embed = new EmbedBuilder
             {
                 Author = author,
-                Title = $"\n**OT:** {(TCInfo.OTName == "" ? "Not set." : TCInfo.OTName)}" +
+                Description = $"\n**OT:** {(TCInfo.OTName == "" ? "Not set." : TCInfo.OTName)}" +
                 $"\n**OTGender:** {(TCInfo.OTGender == "" ? "Not set." : TCInfo.OTGender)}" +
                 $"\n**TID:** {(TCInfo.TID == 0 ? "Not set." : TCInfo.TID)}" +
                 $"\n**SID:** {(TCInfo.SID == 0 ? "Not set." : TCInfo.SID)}" +
