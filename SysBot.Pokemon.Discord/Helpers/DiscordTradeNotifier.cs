@@ -4,6 +4,7 @@ using Discord.WebSocket;
 using PKHeX.Core;
 using System;
 using System.Linq;
+using SysBot.Pokemon.Discord.Helpers;
 
 namespace SysBot.Pokemon.Discord
 {
@@ -98,14 +99,26 @@ namespace SysBot.Pokemon.Discord
         private void SendNotificationZ3(SeedSearchResult r)
         {
             var lines = r.ToString();
-            var embed = new EmbedBuilder { Color = Color.LighterGrey };
+
+            var author = new EmbedAuthorBuilder
+            {
+                IconUrl = Context.User.GetAvatarUrl(),
+                Name = Context.User.Username + "'s Seed:"
+            };
+
+            var embed = new EmbedBuilder
+            {
+                Author = author,
+                Color = Colors.Catch() 
+            };
+
             embed.AddField(x =>
             {
-                x.Name = $"Seed: {r.Seed:X16}";
+                x.Name = $"{r.Seed:X16}";
                 x.Value = lines;
                 x.IsInline = false;
             });
-            var msg = $"Here are the details for `{r.Seed:X16}`:";
+            var msg = $"{r.Seed:X16}";
             if (Hub.Config.SeedCheck.PostResultToChannel && !Hub.Config.SeedCheck.PostResultToBoth)
                 Context.Channel.SendMessageAsync(Trader.Mention + " - " + msg, embed: embed.Build()).ConfigureAwait(false);
             else if (Hub.Config.SeedCheck.PostResultToBoth)

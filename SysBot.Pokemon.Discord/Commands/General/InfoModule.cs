@@ -8,6 +8,7 @@ using System.Linq;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
+using SysBot.Pokemon.Discord.Helpers;
 
 namespace SysBot.Pokemon.Discord
 {
@@ -17,7 +18,7 @@ namespace SysBot.Pokemon.Discord
     public class InfoModule : ModuleBase<SocketCommandContext>
     {
         private const string detail = "I am an open source Discord bot powered by PKHeX.Core and other open source software.";
-        private const string repo = "https://github.com/kwsch/SysBot.NET";
+        private string repo = Links.Repo();
 
         [Command("info")]
         [Alias("about", "whoami", "owner")]
@@ -27,7 +28,7 @@ namespace SysBot.Pokemon.Discord
 
             var builder = new EmbedBuilder
             {
-                Color = new Color(114, 137, 218),
+                Color = Colors.Main(),
                 Description = detail,
             };
 

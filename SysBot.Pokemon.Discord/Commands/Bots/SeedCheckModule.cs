@@ -2,6 +2,7 @@
 using Discord.Commands;
 using PKHeX.Core;
 using System.Threading.Tasks;
+using SysBot.Pokemon.Discord.Helpers;
 
 namespace SysBot.Pokemon.Discord
 {
@@ -75,15 +76,25 @@ namespace SysBot.Pokemon.Discord
             var r = new SeedSearchResult(Z3SearchResult.Success, seed, -1, hub.Config.SeedCheck.ResultDisplayMode);
             var msg = r.ToString();
 
-            var embed = new EmbedBuilder { Color = Color.LighterGrey };
+            var author = new EmbedAuthorBuilder
+            {
+                IconUrl = Context.User.GetAvatarUrl(),
+                Name = Context.User.Username + "'s Seed:"
+            };
+
+            var embed = new EmbedBuilder
+            {
+                Author = author,
+                Color = Colors.Catch()
+            };
 
             embed.AddField(x =>
             {
-                x.Name = $"Seed: {seed:X16}";
+                x.Name = $"{seed:X16}";
                 x.Value = msg;
                 x.IsInline = false;
             });
-            await ReplyAsync($"Here are the details for `{r.Seed:X16}`:", embed: embed.Build()).ConfigureAwait(false);
+            await ReplyAsync($"{r.Seed:X16}", embed: embed.Build()).ConfigureAwait(false);
         }
     }
 }

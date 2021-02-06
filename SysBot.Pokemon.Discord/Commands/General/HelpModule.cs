@@ -3,6 +3,7 @@ using Discord.Commands;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using SysBot.Pokemon.Discord.Helpers;
 
 namespace SysBot.Pokemon.Discord
 {
@@ -19,10 +20,17 @@ namespace SysBot.Pokemon.Discord
         [Summary("Lists available commands.")]
         public async Task HelpAsync()
         {
+            var author = new EmbedAuthorBuilder
+            {
+                IconUrl = Context.User.GetAvatarUrl(),
+                Name = Context.User.Username + ","
+            };
+
             var builder = new EmbedBuilder
             {
-                Color = new Color(114, 137, 218),
-                Description = "These are the commands you can use:"
+                Author = author,
+                Color = Colors.Main(),
+                Title = "these are the commands you can use:"
             };
 
             var mgr = SysCordInstance.Manager;
@@ -54,8 +62,8 @@ namespace SysBot.Pokemon.Discord
 
                 builder.AddField(x =>
                 {
-                    x.Name = module.Name;
-                    x.Value = description;
+                    x.Name = "*__" + module.Name + "__*";
+                    x.Value = ">>> " + description;
                     x.IsInline = false;
                 });
             }
@@ -75,10 +83,17 @@ namespace SysBot.Pokemon.Discord
                 return;
             }
 
+            var author = new EmbedAuthorBuilder
+            {
+                IconUrl = Context.User.GetAvatarUrl(),
+                Name = Context.User.Username + ","
+            };
+
             var builder = new EmbedBuilder
             {
-                Color = new Color(114, 137, 218),
-                Description = $"Here are some commands like **{command}**:"
+                Author = author,
+                Color = Colors.Main(),
+                Title = $"Here are some commands like **{command}**:"
             };
 
             foreach (var match in result.Commands)

@@ -9,6 +9,7 @@ using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
+using SysBot.Pokemon.Discord.Helpers;
 
 namespace SysBot.Pokemon.Discord
 {
@@ -176,10 +177,20 @@ namespace SysBot.Pokemon.Discord
             }
             else if (!TradeCordCanCatch(user, out TimeSpan timeRemaining))
             {
-                var embedTime = new EmbedBuilder { Color = Color.DarkBlue };
-                var timeName = $"{Context.User.Username}, you're too quick!";
-                var timeValue = $"Please try again in {(timeRemaining.Seconds < 1 ? 1 : timeRemaining.Seconds):N0} {(_ = timeRemaining.Seconds > 1 ? "seconds" : "second")}!";
-                await EmbedUtil(embedTime, timeName, timeValue).ConfigureAwait(false);
+                var authorTime = new EmbedAuthorBuilder
+                {
+                    IconUrl = Context.User.GetAvatarUrl(),
+                    Name = $"{Context.User.Username}, you're too quick!"
+                };
+
+                var embedTime = new EmbedBuilder
+                {
+                    Author = authorTime,
+                    Title = $"Please try again in {(timeRemaining.Seconds < 1 ? 1 : timeRemaining.Seconds):N0} {(_ = timeRemaining.Seconds > 1 ? "seconds" : "second")}!",
+                    Color = Colors.Main(),
+                };
+
+                await Context.Message.Channel.SendMessageAsync(embed: embedTime.Build()).ConfigureAwait(false);
                 return;
             }
 
@@ -374,10 +385,21 @@ namespace SysBot.Pokemon.Discord
 
             bool canGmax = new ShowdownSet(ShowdownParsing.GetShowdownText(pkm)).CanGigantamax;
             var pokeImg = PokeImg(pkm, canGmax, pkm.Species == (int)Species.Alcremie ? pkm.Data[0xE4] : 0);
-            var embed = new EmbedBuilder { Color = pkm.IsShiny ? Color.Blue : Color.DarkBlue, ThumbnailUrl = pokeImg }.WithFooter(x => { x.Text = $"\n\n{TradeExtensions.DexFlavor(pkm.Species)}"; x.IconUrl = "https://i.imgur.com/nXNBrlr.png"; });
-            var name = $"{Context.User.Username}'s {(match.Shiny ? "★" : "")}{match.Species}{match.Form} [ID: {match.ID}]";
-            var value = $"\n\n{ReusableActions.GetFormattedShowdownText(pkm)}";
-            await EmbedUtil(embed, name, value).ConfigureAwait(false);
+
+            var author = new EmbedAuthorBuilder
+            {
+                IconUrl = Context.User.GetAvatarUrl(),
+                Name = $"{Context.User.Username}'s {(match.Shiny ? "★" : "")}{match.Species}{match.Form} [ID: {match.ID}]"
+            };
+
+            var embed = new EmbedBuilder
+            {
+                Author = author,
+                Title = $"\n\n{ReusableActions.GetFormattedShowdownText(pkm)}",
+                Color = pkm.IsShiny ? Color.LightOrange : Colors.Catch(),
+                ImageUrl = pokeImg }.WithFooter(x => { x.Text = $"\n\n{TradeExtensions.DexFlavor(pkm.Species)}"; x.IconUrl = Links.PageIcon(); });
+
+            await Context.Message.Channel.SendMessageAsync(embed: embed.Build()).ConfigureAwait(false);
         }
 
         [Command("TradeCordMassRelease")]
@@ -412,10 +434,23 @@ namespace SysBot.Pokemon.Discord
             }
 
             UpdateUserInfo(TCInfo);
-            var embed = new EmbedBuilder { Color = Color.DarkBlue };
-            var name = $"{Context.User.Username}'s Mass Release";
-            var value = species == "" ? "Every non-shiny Pokémon was released, excluding Ditto, favorites, events, and those in daycare." : $"Every {(species.ToLower() == "shiny" ? "shiny Pokémon" : species.ToLower() == "cherish" ? "event Pokémon" : $"non-shiny {species}")} was released, excluding favorites{(species.ToLower() == "cherish" ? "" : ", events,")} and those in daycare.";
-            await EmbedUtil(embed, name, value).ConfigureAwait(false);
+
+            var author = new EmbedAuthorBuilder
+            {
+                IconUrl = Context.User.GetAvatarUrl(),
+                Name = $"{Context.User.Username}'s Mass Release"
+
+            };
+
+            var embed = new EmbedBuilder
+            {
+                Author = author,
+                Title = species == "" ? "Every non-shiny Pokémon was released, excluding Ditto, favorites, events, and those in daycare." : $"Every {(species.ToLower() == "shiny" ? "shiny Pokémon" : species.ToLower() == "cherish" ? "event Pokémon" : $"non-shiny {species}")} was released, excluding favorites{(species.ToLower() == "cherish" ? "" : ", events,")} and those in daycare.",
+                Color = Colors.Main()
+            };
+
+
+            await Context.Message.Channel.SendMessageAsync(embed: embed.Build()).ConfigureAwait(false);
         }
 
         [Command("TradeCordRelease")]
@@ -444,13 +479,23 @@ namespace SysBot.Pokemon.Discord
                 return;
             }
 
-            var embed = new EmbedBuilder { Color = Color.DarkBlue };
-            var name = $"{Context.User.Username}'s Release";
-            var value = $"You release your {(match.Shiny ? "★" : "")}{match.Species}{match.Form}.";
+            var author = new EmbedAuthorBuilder
+            {
+                IconUrl = Context.User.GetAvatarUrl(),
+                Name = $"{Context.User.Username}'s Release"
+            };
+
+            var embed = new EmbedBuilder
+            { 
+                Author = author,
+                Title = $"You release your {(match.Shiny ? "★" : "")}{match.Species}{match.Form}.",
+                Color = Colors.Main()
+            };
+
             File.Delete(match.Path);
             TCInfo.Catches.Remove(match);
             UpdateUserInfo(TCInfo);
-            await EmbedUtil(embed, name, value).ConfigureAwait(false);
+            await Context.Message.Channel.SendMessageAsync(embed: embed.Build()).ConfigureAwait(false);
         }
 
         [Command("TradeCordDaycare")]
@@ -475,9 +520,20 @@ namespace SysBot.Pokemon.Discord
             else if (TCInfo.Daycare1.Species == 0 || TCInfo.Daycare2.Species == 0)
                 msg = $"{(TCInfo.Daycare1.Species == 0 ? dcSpecies2 : dcSpecies1)}\n\nIt seems lonely.";
 
-            var embed = new EmbedBuilder { Color = Color.DarkBlue };
-            var name = $"{Context.User.Username}'s Daycare Info";
-            await EmbedUtil(embed, name, msg).ConfigureAwait(false);
+            var author = new EmbedAuthorBuilder
+            {
+                IconUrl = Context.User.GetAvatarUrl(),
+                Name = $"{Context.User.Username}'s Daycare Info"
+            };
+
+            var embed = new EmbedBuilder
+            { 
+                Author = author,
+                Description = msg,
+                Color = Colors.Main() 
+            };
+
+            await Context.Message.Channel.SendMessageAsync(embed: embed.Build()).ConfigureAwait(false);
         }
 
         [Command("TradeCordDaycare")]
@@ -562,10 +618,21 @@ namespace SysBot.Pokemon.Discord
             }
 
             UpdateUserInfo(TCInfo);
-            var embed = new EmbedBuilder { Color = Color.DarkBlue };
-            var name = $"{Context.User.Username}'s Daycare {(deposit ? "Deposit" : "Withdraw")}";
-            var results = deposit && match != null ? $"Deposited your {(match.Shiny ? "★" : "")}{match.Species}{match.Form}({match.Ball}) to daycare!" : $"You withdrew your {speciesString} from the daycare.";
-            await EmbedUtil(embed, name, results).ConfigureAwait(false);
+
+            var author = new EmbedAuthorBuilder
+            {
+                IconUrl = Context.User.GetAvatarUrl(),
+                Name = $"{Context.User.Username}'s Daycare {(deposit ? "Deposit" : "Withdraw")}"
+            };
+
+            var embed = new EmbedBuilder
+            {
+                Author = author,
+                Title = deposit && match != null ? $"Deposited your {(match.Shiny ? "★" : "")}{match.Species}{match.Form}({match.Ball}) to daycare!" : $"You withdrew your {speciesString} from the daycare.",
+                Color = Colors.Main() 
+            };
+
+            await Context.Message.Channel.SendMessageAsync(embed: embed.Build()).ConfigureAwait(false);
         }
 
         [Command("TradeCordGift")]
@@ -614,17 +681,29 @@ namespace SysBot.Pokemon.Discord
                 newIDParse.Add(receivingUser.Catches[i].ID);
 
             var newID = Indexing(newIDParse.OrderBy(x => x).ToArray());
-            var embed = new EmbedBuilder { Color = Color.Purple };
-            var name = $"{Context.User.Username}'s Gift";
+
+            var author = new EmbedAuthorBuilder
+            {
+                IconUrl = Context.User.GetAvatarUrl(),
+                Name = $"{Context.User.Username}'s Gift"
+            };
+
+            var embed = new EmbedBuilder
+            {
+                Author = author,
+                Title = $"You gifted your {(match.Shiny ? "★" : "")}{match.Species}{match.Form} to {Context.Message.MentionedUsers.First().Username}.",
+                Color = Colors.Gift() 
+            };
+
             var newPath = $"{dir}\\{match.Path.Split('\\')[2].Replace(match.ID.ToString(), newID.ToString())}";
-            var value = $"You gifted your {(match.Shiny ? "★" : "")}{match.Species}{match.Form} to {Context.Message.MentionedUsers.First().Username}.";
+
             File.Move(match.Path, newPath);
 
             receivingUser.Catches.Add(new TradeExtensions.Catch { Ball = match.Ball, Egg = match.Egg, Form = match.Form, ID = newID, Shiny = match.Shiny, Species = match.Species, Path = newPath });
             UpdateUserInfo(receivingUser);
             TCInfo.Catches.Remove(match);
             UpdateUserInfo(TCInfo);
-            await EmbedUtil(embed, name, value).ConfigureAwait(false);
+            await Context.Message.Channel.SendMessageAsync(embed: embed.Build()).ConfigureAwait(false);
         }
 
         [Command("TradeCordTrainerInfoSet")]
@@ -691,10 +770,21 @@ namespace SysBot.Pokemon.Discord
             }
 
             UpdateUserInfo(TCInfo);
-            var embed = new EmbedBuilder { Color = Color.DarkBlue };
-            var name = $"{Context.User.Username}'s Trainer Info";
-            var value = $"\nYou've set your trainer info as the following: \n**OT:** {TCInfo.OTName}\n**OTGender:** {TCInfo.OTGender}\n**TID:** {TCInfo.TID}\n**SID:** {TCInfo.SID}\n**Language:** {TCInfo.Language}";
-            await EmbedUtil(embed, name, value).ConfigureAwait(false);
+
+            var author = new EmbedAuthorBuilder
+            {
+                IconUrl = Context.User.GetAvatarUrl(),
+                Name = $"{Context.User.Username}'s Trainer Info"
+            };
+
+            var embed = new EmbedBuilder
+            {
+                Author = author,
+                Title = $"\nYou've set your trainer info as the following: \n**OT:** {TCInfo.OTName}\n**OTGender:** {TCInfo.OTGender}\n**TID:** {TCInfo.TID}\n**SID:** {TCInfo.SID}\n**Language:** {TCInfo.Language}",
+                Color = Colors.Main()
+            };
+
+            await Context.Message.Channel.SendMessageAsync(embed: embed.Build()).ConfigureAwait(false);
         }
 
         [Command("TradeCordTrainerInfo")]
@@ -704,14 +794,25 @@ namespace SysBot.Pokemon.Discord
         public async Task TrainerInfo()
         {
             TradeCordParanoiaChecks(Context);
-            var embed = new EmbedBuilder { Color = Color.DarkBlue };
-            var name = $"{Context.User.Username}'s Trainer Info";
-            var value = $"\n**OT:** {(TCInfo.OTName == "" ? "Not set." : TCInfo.OTName)}" +
+
+            var author = new EmbedAuthorBuilder
+            {
+                IconUrl = Context.User.GetAvatarUrl(),
+                Name = $"{Context.User.Username}'s Trainer Info"
+            };
+
+            var embed = new EmbedBuilder
+            {
+                Author = author,
+                Title = $"\n**OT:** {(TCInfo.OTName == "" ? "Not set." : TCInfo.OTName)}" +
                 $"\n**OTGender:** {(TCInfo.OTGender == "" ? "Not set." : TCInfo.OTGender)}" +
                 $"\n**TID:** {(TCInfo.TID == 0 ? "Not set." : TCInfo.TID)}" +
                 $"\n**SID:** {(TCInfo.SID == 0 ? "Not set." : TCInfo.SID)}" +
-                $"\n**Language:** {(TCInfo.Language == "" ? "Not set." : TCInfo.Language)}";
-            await EmbedUtil(embed, name, value).ConfigureAwait(false);
+                $"\n**Language:** {(TCInfo.Language == "" ? "Not set." : TCInfo.Language)}",
+                Color = Colors.Main()
+            };
+
+            await Context.Message.Channel.SendMessageAsync(embed: embed.Build()).ConfigureAwait(false);
         }
 
         [Command("TradeCordFavorites")]
@@ -780,7 +881,12 @@ namespace SysBot.Pokemon.Discord
         public async Task TradeCordDex([Summary("Optional parameter \"Missing\" for missing entries.")]string mode = "")
         {
             TradeCordParanoiaChecks(Context);
-            var embed = new EmbedBuilder { Color = Color.DarkBlue };
+
+            var embed = new EmbedBuilder
+            { 
+                Color = Colors.Main()
+            };
+
             var name = $"{Context.User.Username}'s {(mode.ToLower() == "missing" ? "Missing Entries" : "Dex Info")}";
             var value = $"\n**Pokédex:** {TCInfo.Dex.Count}/664" +
                 $"\n**Pokédex Completion Count:** {TCInfo.DexCompletionCount}";
@@ -1048,14 +1154,17 @@ namespace SysBot.Pokemon.Discord
             }
             else pageContent.Add(entry == "" ? emptyList : entry);
 
-            var embed = new EmbedBuilder { Color = Color.DarkBlue }.AddField(x =>
+            var embed = new EmbedBuilder
+            { 
+                Color = Colors.Main() 
+            }.AddField(x =>
             {
                 x.Name = nameMsg;
                 x.Value = pageContent[0];
                 x.IsInline = false;
             }).WithFooter(x =>
             {
-                x.IconUrl = "https://i.imgur.com/nXNBrlr.png";
+                x.IconUrl = Links.PageIcon();
                 x.Text = $"Page 1 of {pageContent.Count}";
             });
 
@@ -1080,7 +1189,17 @@ namespace SysBot.Pokemon.Discord
             IEmote[] reactions = { new Emoji("⬅️"), new Emoji("➡️") };
             await msg.AddReactionsAsync(reactions).ConfigureAwait(false);
             var sw = new Stopwatch();
-            var embed = new EmbedBuilder { Color = Color.DarkBlue }.AddField(x => { x.Name = nameMsg; x.IsInline = false; }).WithFooter(x => { x.IconUrl = "https://i.imgur.com/nXNBrlr.png"; });
+
+            var embed = new EmbedBuilder
+            { 
+                Color = Colors.Main() 
+            }.AddField(x =>
+            {
+                x.Name = nameMsg; x.IsInline = false; 
+            }).WithFooter(x =>
+            {
+                x.IconUrl = Links.PageIcon(); 
+            });
 
             sw.Start();
             while (sw.ElapsedMilliseconds < 20_000)
@@ -1114,18 +1233,17 @@ namespace SysBot.Pokemon.Discord
         private string PokeImg(PKM pkm, bool canGmax, uint alcremieDeco)
         {
             bool md = false;
-            bool fd = false;
-            var baseLink = "https://projectpokemon.org/images/sprites-models/homeimg/poke_capture_0001_000_mf_n_00000000_f_n.png".Split('_');
+            var baseLink = Links.tc_Baseurl().Split('_');
             if (TradeExtensions.GenderDependent.Contains(pkm.Species) && !canGmax && pkm.Form == 0)
             {
                 if (pkm.Gender == 0)
                     md = true;
-                else fd = true;
+                else md = true;
             }
 
             baseLink[2] = pkm.Species < 10 ? $"000{pkm.Species}" : pkm.Species < 100 && pkm.Species > 9 ? $"00{pkm.Species}" : $"0{pkm.Species}";
             baseLink[3] = pkm.Form < 10 ? $"00{pkm.Form}" : $"0{pkm.Form}";
-            baseLink[4] = pkm.PersonalInfo.OnlyFemale ? "fo" : pkm.PersonalInfo.OnlyMale ? "mo" : pkm.PersonalInfo.Genderless ? "uk" : fd ? "fd" : md ? "md" : "mf";
+            baseLink[4] = pkm.PersonalInfo.OnlyFemale ? "fo" : pkm.PersonalInfo.OnlyMale ? "mo" : pkm.PersonalInfo.Genderless ? "uk" : md ? "fd" : md ? "md" : "mf";
             baseLink[5] = canGmax ? "g" : "n";
             baseLink[6] = "0000000" + (pkm.Species == (int)Species.Alcremie ? alcremieDeco : 0);
             baseLink[8] = pkm.IsShiny ? "r.png" : "n.png";
@@ -1306,10 +1424,23 @@ namespace SysBot.Pokemon.Discord
             var form = nidoranGender != string.Empty ? nidoranGender : TradeExtensions.FormOutput(TCRng.CatchPKM.Species, TCRng.CatchPKM.Form, out _);
             var pokeImg = PokeImg(TCRng.CatchPKM, TCRng.CatchPKM.CanGigantamax, TCRng.CatchPKM.Species == (int)Species.Alcremie ? TCRng.CatchPKM.Data[0xE4] : 0);
             var ballImg = $"https://serebii.net/itemdex/sprites/pgl/" + $"{(Ball)TCRng.CatchPKM.Ball}ball".ToLower() + ".png";
-            var embed = new EmbedBuilder { Color = (TCRng.CatchPKM.IsShiny && TCRng.CatchPKM.Ball == 16) || TCRng.CatchPKM.ShinyXor == 0 ? Color.Gold : TCRng.CatchPKM.ShinyXor <= 16 ? Color.LightOrange : Color.Teal, ImageUrl = pokeImg, ThumbnailUrl = ballImg };
-            var catchName = $"{Context.User.Username}'s Catch [#{TCInfo.CatchCount}]" + "&^&\nResults" + $"{(EggEmbedMsg != string.Empty ? "&^&\nEggs" : "")}";
-            var catchMsg = $"You threw {(TCRng.CatchPKM.Ball == 2 ? "an" : "a")} {(Ball)TCRng.CatchPKM.Ball} Ball at a {(TCRng.CatchPKM.IsShiny ? "**shiny** wild **" + speciesName + form + "**" : "wild " + speciesName + form)}..." +
-                $"&^&Success! It put up a fight, but you caught {(TCRng.CatchPKM.IsShiny ? "**" + speciesName + form + $" [ID: {index}]**" : speciesName + form + $" [ID: {index}]")}!";
+
+            var author = new EmbedAuthorBuilder
+            {
+                IconUrl = ballImg,
+                Name = $"{Context.User.Username}'s Catch [#{TCInfo.CatchCount}]"
+            };
+
+            var embed = new EmbedBuilder
+            { 
+                Author = author,
+                Title = $"*You threw {(TCRng.CatchPKM.Ball == 2 ? "an" : "a")} {(Ball)TCRng.CatchPKM.Ball} Ball at a {(TCRng.CatchPKM.IsShiny ? "**shiny** wild **" + speciesName + form + "**" : "wild " + speciesName + form)}...*",
+                Color = (TCRng.CatchPKM.IsShiny && TCRng.CatchPKM.Ball == 16) || TCRng.CatchPKM.ShinyXor == 0 ? Color.Gold : TCRng.CatchPKM.ShinyXor <= 16 ? Color.LightOrange : Colors.Catch(),
+                ImageUrl = pokeImg 
+            };
+            
+            var catchName = "Results" + $"{(EggEmbedMsg != string.Empty ? "&^&\nEggs" : "")}";
+            var catchMsg = $"Success! It put up a fight, but you caught {(TCRng.CatchPKM.IsShiny ? "**" + speciesName + form + $" [ID: {index}]**" : speciesName + form + $" [ID: {index}]")}!";
             if (TCInfo.DexCompletionCount < 5)
                 DexCount(EggEmbedMsg != "");
 
@@ -1323,13 +1454,26 @@ namespace SysBot.Pokemon.Discord
         {
             var spookyRng = TradeExtensions.Random.Next(101);
             var imgRng = TradeExtensions.Random.Next(1, 3);
-            string imgGarf = "https://i.imgur.com/BOb6IbW.png";
-            string imgConk = "https://i.imgur.com/oSUQhYv.png";
+            string imgGarf = Links.ScareA();
+            string imgConk = Links.ScareB();
             var ball = (Ball)TradeExtensions.Random.Next(2, 26);
-            var embedFail = new EmbedBuilder { Color = Color.Teal, ImageUrl = spookyRng >= 90 && imgRng == 1 ? imgGarf : spookyRng >= 90 && imgRng == 2 ? imgConk : "" };
-            var failName = $"{Context.User.Username}'s Catch" + "&^&Results" + $"{(EggEmbedMsg != string.Empty ? "&^&\nEggs" : "")}";
-            var failMsg = $"You threw {(ball == Ball.Ultra ? "an" : "a")} {(ball == Ball.Cherish ? Ball.Poke : ball)} Ball at a wild {(spookyRng >= 90 && imgRng != 3 ? "...whatever that thing is" : SpeciesName.GetSpeciesNameGeneration(TCRng.SpeciesRNG, 2, 8))}..." +
-                $"&^&{(spookyRng >= 90 && imgRng != 3 ? "One wiggle... Two... It breaks free and stares at you, smiling. You run for dear life." : "...but it managed to escape!")}";
+
+            var author = new EmbedAuthorBuilder
+            {
+                IconUrl = Context.User.GetAvatarUrl(),
+                Name = $"{Context.User.Username}'s Catch"
+            };
+
+            var embedFail = new EmbedBuilder
+            { 
+                Author = author,
+                Color = Colors.Fail(),
+                Title = $"You threw {(ball == Ball.Ultra ? "an" : "a")} {(ball == Ball.Cherish ? Ball.Poke : ball)} Ball at a wild {(spookyRng >= 90 && imgRng != 3 ? "...whatever that thing is" : SpeciesName.GetSpeciesNameGeneration(TCRng.SpeciesRNG, 2, 8))}...",
+                ImageUrl = spookyRng >= 90 && imgRng == 1 ? imgGarf : spookyRng >= 90 && imgRng == 2 ? imgConk : "" 
+            };
+            
+            var failName = "Results" + $"{(EggEmbedMsg != string.Empty ? "&^&\nEggs" : "")}";
+            var failMsg = $"{(spookyRng >= 90 && imgRng != 3 ? "One wiggle... Two... It breaks free and stares at you, smiling. You run for dear life." : "...but it managed to escape!")}";
             if (TCInfo.DexCompletionCount < 5)
                 DexCount(EggEmbedMsg != "");
 
