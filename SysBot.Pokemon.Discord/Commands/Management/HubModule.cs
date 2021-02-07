@@ -4,6 +4,7 @@ using PKHeX.Core;
 using System;
 using System.Linq;
 using System.Threading.Tasks;
+using SysBot.Pokemon.Discord.Helpers;
 
 namespace SysBot.Pokemon.Discord
 {
@@ -19,7 +20,7 @@ namespace SysBot.Pokemon.Discord
 
             var builder = new EmbedBuilder
             {
-                Color = Color.Gold,
+                Color = Colors.Main(),
             };
             builder.AddField(x =>
             {
