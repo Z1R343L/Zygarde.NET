@@ -395,7 +395,7 @@ namespace SysBot.Pokemon.Discord
             var embed = new EmbedBuilder
             {
                 Author = author,
-                Title = $"\n\n{ReusableActions.GetFormattedShowdownText(pkm)}",
+                Description = $"{ReusableActions.GetFormattedShowdownText(pkm)}",
                 Color = pkm.IsShiny ? Color.LightOrange : Colors.Catch(),
                 ImageUrl = pokeImg }.WithFooter(x => { x.Text = $"\n\n{TradeExtensions.DexFlavor(pkm.Species)}"; x.IconUrl = Links.PageIcon(); });
 
@@ -884,7 +884,7 @@ namespace SysBot.Pokemon.Discord
 
             var embed = new EmbedBuilder
             { 
-                Color = Colors.Main()
+                Color = Colors.Main_White()
             };
 
             var name = $"{Context.User.Username}'s {(mode.ToLower() == "missing" ? "Missing Entries" : "Dex Info")}";
@@ -1156,7 +1156,7 @@ namespace SysBot.Pokemon.Discord
 
             var embed = new EmbedBuilder
             { 
-                Color = Colors.Main() 
+                Color = Colors.Main_White()
             }.AddField(x =>
             {
                 x.Name = nameMsg;
@@ -1192,7 +1192,7 @@ namespace SysBot.Pokemon.Discord
 
             var embed = new EmbedBuilder
             { 
-                Color = Colors.Main() 
+                Color = Colors.Main_White() 
             }.AddField(x =>
             {
                 x.Name = nameMsg; x.IsInline = false; 
@@ -1434,7 +1434,7 @@ namespace SysBot.Pokemon.Discord
             var embed = new EmbedBuilder
             { 
                 Author = author,
-                Title = $"*You threw {(TCRng.CatchPKM.Ball == 2 ? "an" : "a")} {(Ball)TCRng.CatchPKM.Ball} Ball at a {(TCRng.CatchPKM.IsShiny ? "**shiny** wild **" + speciesName + form + "**" : "wild " + speciesName + form)}...*",
+                Title = $"You threw {(TCRng.CatchPKM.Ball == 2 ? "an" : "a")} {(Ball)TCRng.CatchPKM.Ball} Ball at a {(TCRng.CatchPKM.IsShiny ? "**shiny** wild **" + speciesName + form + "**" : "wild " + speciesName + form)}...",
                 Color = (TCRng.CatchPKM.IsShiny && TCRng.CatchPKM.Ball == 16) || TCRng.CatchPKM.ShinyXor == 0 ? Color.Gold : TCRng.CatchPKM.ShinyXor <= 16 ? Color.LightOrange : Colors.Catch(),
                 ImageUrl = pokeImg 
             };

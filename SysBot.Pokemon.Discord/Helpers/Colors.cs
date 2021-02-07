@@ -142,5 +142,13 @@ namespace SysBot.Pokemon.Discord.Helpers
             Color Gift = new Color(255, 89, 178);
             return Gift;
         }
+
+        public static Color Main_White()
+        {
+            Color Main_White = new Color(217, 219, 224);
+            return Main_White;
+        }
+
+
     }
 }
