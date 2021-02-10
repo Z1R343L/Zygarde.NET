@@ -18,6 +18,7 @@ namespace SysBot.Pokemon.Discord
         private static TradeQueueInfo<PK8> Info => SysCordInstance.Self.Hub.Queues.Info;
         private readonly TradeExtensions.TCRng TCRng = new();
         private TradeExtensions.TCUserInfo TCInfo = new();
+        private readonly object _sync = new();
         private MysteryGift? MGRngEvent = default;
         private string EggEmbedMsg = string.Empty;
         private string EventPokeType = string.Empty;
@@ -389,7 +390,7 @@ namespace SysBot.Pokemon.Discord
             TradeCordParanoiaChecks(Context);
             List<TradeExtensions.Catch> matches = new();
             if (species.ToLower() == "cherish")
-                matches = TCInfo.Catches.FindAll(x => !x.Shiny && x.Ball != "Cherish" && x.Species != "Ditto" && x.ID != TCInfo.Daycare1.ID && x.ID != TCInfo.Daycare2.ID && TCInfo.Favorites.Find(z => z == x.ID) == default);
+                matches = TCInfo.Catches.FindAll(x => !x.Shiny && x.Ball == "Cherish" && x.Species != "Ditto" && x.ID != TCInfo.Daycare1.ID && x.ID != TCInfo.Daycare2.ID && TCInfo.Favorites.Find(z => z == x.ID) == default);
             else if (species.ToLower() == "shiny")
                 matches = TCInfo.Catches.FindAll(x => x.Shiny && x.Ball != "Cherish" && x.Species != "Ditto" && x.ID != TCInfo.Daycare1.ID && x.ID != TCInfo.Daycare2.ID && TCInfo.Favorites.Find(z => z == x.ID) == default);
             else if (species != "")
@@ -799,7 +800,7 @@ namespace SysBot.Pokemon.Discord
                     missing.Add(SpeciesName.GetSpeciesNameGeneration(entry, 2, 8));
 
                 missing = missing.Distinct().ToList();
-                value = string.Join(",", missing.OrderBy(x => x));
+                value = string.Join(", ", missing.OrderBy(x => x));
             }
             await ListUtil(name, value).ConfigureAwait(false);
         }
@@ -1022,6 +1023,8 @@ namespace SysBot.Pokemon.Discord
             {
                 var split = name.Split(' ');
                 name = split[0] + " " + split[1].Substring(0, 1).ToUpper() + split[1].Substring(1).ToLower();
+                if (name.Contains("-"))
+                    name = name.Split('-')[0] + "-" + name.Split('-')[1].Substring(0, 1).ToUpper() + name.Split('-')[1].Substring(1);
             }
 
             return name;
@@ -1357,47 +1360,56 @@ namespace SysBot.Pokemon.Discord
 
         private TradeExtensions.TCUserInfo GetUserInfo(ulong id)
         {
-            var root = GetUserRoot();
-            var user = root?.Users.FirstOrDefault(x => x.UserID == id);
-            if (user == null)
+            lock (_sync)
             {
-                if (root == null)
-                    return new TradeExtensions.TCUserInfo();
-                else
+                var root = GetUserRoot();
+                var user = root?.Users.FirstOrDefault(x => x.UserID == id);
+                if (user == null)
                 {
-                    root.Users.Add(new TradeExtensions.TCUserInfo { UserID = id });
-                    using StreamWriter writer = File.CreateText("TradeCord\\UserInfo.json");
-                    JsonSerializer serializer = new();
-                    serializer.Formatting = Formatting.Indented;
-                    serializer.Serialize(writer, root);
-                    return root.Users.FirstOrDefault(x => x.UserID == id);
+                    if (root == null)
+                        return new TradeExtensions.TCUserInfo();
+                    else
+                    {
+                        root.Users.Add(new TradeExtensions.TCUserInfo { UserID = id });
+                        using StreamWriter writer = File.CreateText("TradeCord\\UserInfo.json");
+                        JsonSerializer serializer = new();
+                        serializer.Formatting = Formatting.Indented;
+                        serializer.Serialize(writer, root);
+                        return root.Users.FirstOrDefault(x => x.UserID == id);
+                    }
                 }
+                else return user;
             }
-            else return user;
         }
 
         private TradeExtensions.TCUserInfoRoot GetUserRoot()
         {
-            JsonSerializer serializer = new();
-            using TextReader reader = File.OpenText("TradeCord\\UserInfo.json");
-            TradeExtensions.TCUserInfoRoot? root = (TradeExtensions.TCUserInfoRoot?)serializer.Deserialize(reader, typeof(TradeExtensions.TCUserInfoRoot));
-            reader.Close();
-            return root ?? new TradeExtensions.TCUserInfoRoot();
+            lock (_sync)
+            {
+                JsonSerializer serializer = new();
+                using TextReader reader = File.OpenText("TradeCord\\UserInfo.json");
+                TradeExtensions.TCUserInfoRoot? root = (TradeExtensions.TCUserInfoRoot?)serializer.Deserialize(reader, typeof(TradeExtensions.TCUserInfoRoot));
+                reader.Close();
+                return root ?? new TradeExtensions.TCUserInfoRoot();
+            }
         }
 
         private void UpdateUserInfo(TradeExtensions.TCUserInfo info)
         {
-            JsonSerializer serializer = new();
-            using TextReader reader = File.OpenText("TradeCord\\UserInfo.json");
-            var root = GetUserRoot();
-            reader.Close();
-            if (info != null && root != null)
+            lock (_sync)
             {
-                var userIndex = root.Users.FindIndex(0, x => x.UserID == info.UserID);
-                root.Users[userIndex] = info;
-                using StreamWriter writer = File.CreateText("TradeCord\\UserInfo.json");
-                serializer.Formatting = Formatting.Indented;
-                serializer.Serialize(writer, root);
+                JsonSerializer serializer = new();
+                using TextReader reader = File.OpenText("TradeCord\\UserInfo.json");
+                var root = GetUserRoot();
+                reader.Close();
+                if (info != null && root != null)
+                {
+                    var userIndex = root.Users.FindIndex(0, x => x.UserID == info.UserID);
+                    root.Users[userIndex] = info;
+                    using StreamWriter writer = File.CreateText("TradeCord\\UserInfo.json");
+                    serializer.Formatting = Formatting.Indented;
+                    serializer.Serialize(writer, root);
+                }
             }
         }
 
