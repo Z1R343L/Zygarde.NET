@@ -1166,6 +1166,7 @@ namespace SysBot.Pokemon.Discord
                     (int)Species.Pikachu => _ = formEdgeCaseRng == 1 ? "" : TradeExtensions.PartnerPikachuHeadache[TradeExtensions.Random.Next(TradeExtensions.PartnerPikachuHeadache.Length)],
                     (int)Species.Dracovish or (int)Species.Dracozolt => _ = formEdgeCaseRng == 1 ? "" : "\nAbility: Sand Rush",
                     (int)Species.Arctovish or (int)Species.Arctozolt => _ = formEdgeCaseRng == 1 ? "" : "\nAbility: Slush Rush",
+                    (int)Species.Landorus or (int)Species.Thundurus or (int)Species.Tornadus => _ = formEdgeCaseRng == 1 ? "" : "Therian\nAbility: Intimidate",
                     (int)Species.Zygarde => forms[TradeExtensions.Random.Next(forms.Length - 1)],
                     _ => EventPokeType == "" ? forms[TradeExtensions.Random.Next(forms.Length)] : EventPokeType == "Base" ? "" : forms[int.Parse(EventPokeType)],
                 };
