@@ -1,9 +1,10 @@
 ﻿using PKHeX.Core;
 using PKHeX.Core.AutoMod;
+using Newtonsoft.Json;
 using System;
-using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Collections.Generic;
 
 namespace SysBot.Pokemon
 {
@@ -135,12 +136,12 @@ namespace SysBot.Pokemon
             public string Form { get; set; } = "";
             public bool Egg { get; set; }
             public string Path { get; set; } = "";
+            public bool Traded { get; set; }
         }
 
         public class TCUserInfo
         {
             public ulong UserID { get; set; }
-            public Catch? TradedPKM { get; set; }
             public int CatchCount { get; set; }
             public Daycare1 Daycare1 { get; set; } = new();
             public Daycare2 Daycare2 { get; set; } = new();
@@ -149,15 +150,15 @@ namespace SysBot.Pokemon
             public int TID { get; set; }
             public int SID { get; set; }
             public string Language { get; set; } = "";
-            public List<int> Dex { get; set; } = new();
+            public HashSet<int> Dex { get; set; } = new();
             public int DexCompletionCount { get; set; }
-            public List<int> Favorites { get; set; } = new();
-            public List<Catch> Catches { get; set; } = new();
+            public HashSet<int> Favorites { get; set; } = new();
+            public HashSet<Catch> Catches { get; set; } = new();
         }
 
         public class TCUserInfoRoot
         {
-            public List<TCUserInfo> Users { get; set; } = new();
+            public HashSet<TCUserInfo> Users { get; set; } = new();
         }
 
         public static bool ShinyLockCheck(int species, string ball, bool form)
@@ -236,8 +237,8 @@ namespace SysBot.Pokemon
 
         public static PKM EggRngRoutine(TCUserInfo info, string trainerInfo, int evo1, int evo2, bool star, bool square)
         {
-            var pkm1 = PKMConverter.GetPKMfromBytes(File.ReadAllBytes(info.Catches.Find(x => x.ID == info.Daycare1.ID).Path));
-            var pkm2 = PKMConverter.GetPKMfromBytes(File.ReadAllBytes(info.Catches.Find(x => x.ID == info.Daycare2.ID).Path));
+            var pkm1 = PKMConverter.GetPKMfromBytes(File.ReadAllBytes(info.Catches.FirstOrDefault(x => x.ID == info.Daycare1.ID).Path));
+            var pkm2 = PKMConverter.GetPKMfromBytes(File.ReadAllBytes(info.Catches.FirstOrDefault(x => x.ID == info.Daycare2.ID).Path));
             if (pkm1 == null || pkm2 == null)
                 return new PK8();
             
@@ -496,6 +497,66 @@ namespace SysBot.Pokemon
                 return (PK8)mgPkm;
             }
             else return new();
+        }
+
+        private static void AddNewUser(TCUserInfoRoot root, ulong id, string file)
+        {
+            root.Users.Add(new TCUserInfo { UserID = id });
+            SerializeInfo(root, file);
+        }
+
+        public static T? GetRoot<T>(string file)
+        {
+            JsonSerializer serializer = new();
+            using TextReader reader = File.OpenText(file);
+            T? root = (T?)serializer.Deserialize(reader, typeof(T));
+            reader.Close();
+            return root;
+        }
+
+        public static TCUserInfo GetUserInfo(ulong id, string file)
+        {
+            var root = GetRoot<TCUserInfoRoot>(file);
+            var user = root?.Users.FirstOrDefault(x => x.UserID == id);
+            if (root == null)
+            {
+                root = new();
+                AddNewUser(root, id, file);
+            }
+            else if (user == null)
+                AddNewUser(root, id, file);
+
+            return user ?? root.Users.FirstOrDefault(x => x.UserID == id);
+        }
+
+        public static void UpdateUserInfo(TCUserInfo info, string file)
+        {
+            using TextReader reader = File.OpenText(file);
+            reader.Close();
+            var root = GetRoot<TCUserInfoRoot>(file);
+            if (info != null)
+            {
+                if (root == null)
+                {
+                    root = new();
+                    root.Users.Add(info);
+                }
+                else
+                {
+                    var user = root.Users.FirstOrDefault(x => x.UserID == info.UserID);
+                    root.Users.Remove(user);
+                    root.Users.Add(info);
+                }
+                SerializeInfo(root, file);
+            }
+        }
+
+        public static void SerializeInfo(object? root, string filePath)
+        {
+            JsonSerializer serializer = new();
+            using StreamWriter writer = File.CreateText(filePath);
+            serializer.Formatting = Formatting.Indented;
+            serializer.Serialize(writer, root);
         }
     }
 }

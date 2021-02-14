@@ -65,7 +65,8 @@ namespace SysBot.Pokemon.Discord
                 var user = Trader.Id.ToString();
                 var origPath = TradeExtensions.TradeCordPath.FirstOrDefault(x => x.Contains(user));
                 var tradedPath = System.IO.Path.Combine($"TradeCord\\Backup\\{user}", origPath.Split('\\')[2]);
-                System.IO.File.Move(origPath, tradedPath);
+                try { System.IO.File.Move(origPath, tradedPath); }
+                catch (System.IO.IOException) { System.IO.File.Move(origPath, tradedPath.Insert(tradedPath.IndexOf(".") - 1, "_ex")); }
                 TradeExtensions.TradeCordPath.Remove(origPath);
             }
         }
