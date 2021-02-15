@@ -29,7 +29,7 @@ namespace SysBot.Pokemon.Discord
             var builder = new EmbedBuilder
             {
                 Author = author,
-                Color = Colors.Main(),
+                Color = Colors.Main_White(),
                 Title = "these are the commands you can use:"
             };
 
@@ -92,7 +92,7 @@ namespace SysBot.Pokemon.Discord
             var builder = new EmbedBuilder
             {
                 Author = author,
-                Color = Colors.Main(),
+                Color = Colors.Main_White(),
                 Title = $"Here are some commands like **{command}**:"
             };
 
