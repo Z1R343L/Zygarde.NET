@@ -5,7 +5,7 @@
 
 For specific support for this fork of kwsch's SysBot.NET repo feel free to join! (No support will be provided in the official PKHeX Discord, please don't bother the devs)
 
-[<img src="https://discordapp.com/api/guilds/695809740428673034/embed.png?style=banner2">](https://discord.gg/KrPRNk9)
+[<img src="https://discordapp.com/api/guilds/705294862248837192/embed.png?style=banner2">](https://discord.gg/KrPRNk9)
 
 [USB-Botbase](https://github.com/fishguy6564/USB-Botbase) client for remote USB control for this fork.
 
