@@ -683,24 +683,57 @@ namespace SysBot.Pokemon.Discord
 
             var newID = Indexing(newIDParse.OrderBy(x => x).ToArray());
 
-            var author = new EmbedAuthorBuilder
-            {
-                IconUrl = Context.User.GetAvatarUrl(),
-                Name = $"{Context.User.Username}'s Gift"
-            };
-
-            var embed = new EmbedBuilder
-            {
-                Author = author,
-                Description = $"You gifted your {(match.Shiny ? "★" : "")}{match.Species}{match.Form} to {Context.Message.MentionedUsers.First().Username}.",
-                Color = Colors.Gift() 
-            };
+            
 
             var newPath = $"{dir}\\{match.Path.Split('\\')[2].Replace(match.ID.ToString(), newID.ToString())}";
 
             File.Move(match.Path, newPath);
 
             receivingUser.Catches.Add(new TradeExtensions.Catch { Ball = match.Ball, Egg = match.Egg, Form = match.Form, ID = newID, Shiny = match.Shiny, Species = match.Species, Path = newPath });
+
+            var pkm = PKMConverter.GetPKMfromBytes(File.ReadAllBytes(newPath));
+            if (pkm == null)
+            {
+                await Context.Message.Channel.SendMessageAsync("Oops, something happened when converting your Pokémon!").ConfigureAwait(false);
+                return;
+            }
+
+            var author = new EmbedAuthorBuilder
+            {
+                IconUrl = Context.User.GetAvatarUrl(),
+                Name = $"{Context.User.Username}'s Gift"
+            };
+
+            var desc = $"You gifted your {(match.Shiny ? "★" : "")}{match.Species}{match.Form} to {Context.Message.MentionedUsers.First().Username}.";
+
+            var embed = new EmbedBuilder
+            {
+                Author = author,
+                Description = desc,
+                Color = Colors.Gift()
+            };
+
+            
+            bool newDexEntry = !receivingUser.Dex.Contains(pkm.Species);
+            if (newDexEntry)
+            {
+                receivingUser.Dex.Add(pkm.Species);
+                var footer_str = $"Registered to {Context.Message.MentionedUsers.First().Username}'s Dex!";
+                if (receivingUser.Dex.Count == 664)
+                {
+                    receivingUser.Dex.Clear();
+                    receivingUser.DexCompletionCount += 1;
+                    footer_str += receivingUser.DexCompletionCount < 5 ? " Shiny Charm improved!" : " Shiny Charm is now fully upgraded!";
+                }
+
+                var footer = new EmbedFooterBuilder
+                {
+                    IconUrl = Links.PageIcon(),
+                    Text = footer_str
+                };
+
+                embed.WithFooter(footer);
+            }
             UpdateUserInfo(receivingUser);
             TCInfo.Catches.Remove(match);
             UpdateUserInfo(TCInfo);
