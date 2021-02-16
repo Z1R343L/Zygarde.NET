@@ -306,13 +306,14 @@ namespace SysBot.Pokemon.Discord
             }
 
             IEnumerable<TradeExtensions.Catch> matches;
+            var list = TCInfo.Catches.ToList();
             if (filters != "" && !filters.Contains(" ") && !filters.Contains("shiny")) // Look for name and ball
-                matches = TCInfo.Catches.TakeWhile(x => filters.Contains(x.Ball.ToLower()) && (name == "Shinies" ? x.Shiny : name.Contains(x.Species + x.Form)) && !x.Traded);
+                matches = list.FindAll(x => filters.Contains(x.Ball.ToLower()) && (name == "Shinies" ? x.Shiny : name.Contains(x.Species + x.Form)) && !x.Traded);
             else if (filters != "" && !filters.Contains(" ") && filters.Contains("shiny")) // Look for name and shiny
-                matches = TCInfo.Catches.TakeWhile(x => x.Shiny && name.Contains(x.Species + x.Form) && !x.Traded);
+                matches = list.FindAll(x => x.Shiny && name.Contains(x.Species + x.Form) && !x.Traded);
             else if (filters != "" && filters.Contains(" ")) // Look for name, ball, and shiny
-                matches = TCInfo.Catches.TakeWhile(x => x.Shiny && filters.Contains(x.Ball.ToLower()) && name.Contains(x.Species + x.Form) && !x.Traded);
-            else matches = TCInfo.Catches.TakeWhile(x => (name == "All" ? x.Species != "" : name == "Egg" ? x.Egg : name == "Shinies" ? x.Shiny : x.Ball == name || x.Species == name || (x.Species + x.Form == name) || x.Form.Replace("-", "") == name) && !x.Traded);
+                matches = list.FindAll(x => x.Shiny && filters.Contains(x.Ball.ToLower()) && name.Contains(x.Species + x.Form) && !x.Traded);
+            else matches = list.FindAll(x => (name == "All" ? x.Species != "" : name == "Egg" ? x.Egg : name == "Shinies" ? x.Shiny : x.Ball == name || x.Species == name || (x.Species + x.Form == name) || x.Form.Replace("-", "") == name) && !x.Traded);
 
             HashSet<string> count = new(), countSh = new();
             if (name == "Shinies")
@@ -387,16 +388,17 @@ namespace SysBot.Pokemon.Discord
         {
             TradeCordParanoiaChecks(Context);
             IEnumerable<TradeExtensions.Catch> matches;
+            var list = TCInfo.Catches.ToList();
             if (species.ToLower() == "cherish")
-                matches = TCInfo.Catches.TakeWhile(x => !x.Traded && !x.Shiny && x.Ball == "Cherish" && x.Species != "Ditto" && x.ID != TCInfo.Daycare1.ID && x.ID != TCInfo.Daycare2.ID && TCInfo.Favorites.FirstOrDefault(z => z == x.ID) == default);
+                matches = list.FindAll(x => !x.Traded && !x.Shiny && x.Ball == "Cherish" && x.Species != "Ditto" && x.ID != TCInfo.Daycare1.ID && x.ID != TCInfo.Daycare2.ID && TCInfo.Favorites.FirstOrDefault(z => z == x.ID) == default);
             else if (species.ToLower() == "shiny")
-                matches = TCInfo.Catches.TakeWhile(x => !x.Traded && x.Shiny && x.Ball != "Cherish" && x.Species != "Ditto" && x.ID != TCInfo.Daycare1.ID && x.ID != TCInfo.Daycare2.ID && TCInfo.Favorites.FirstOrDefault(z => z == x.ID) == default);
+                matches = list.FindAll(x => !x.Traded && x.Shiny && x.Ball != "Cherish" && x.Species != "Ditto" && x.ID != TCInfo.Daycare1.ID && x.ID != TCInfo.Daycare2.ID && TCInfo.Favorites.FirstOrDefault(z => z == x.ID) == default);
             else if (species != "")
             {
                 species = ListNameSanitize(species);
-                matches = TCInfo.Catches.TakeWhile(x => !x.Traded && (species == "Shiny" ? x.Shiny : !x.Shiny) && (species == "Cherish" ? x.Ball == "Cherish" : x.Ball != "Cherish") && x.Species != "Ditto" && x.ID != TCInfo.Daycare1.ID && x.ID != TCInfo.Daycare2.ID && TCInfo.Favorites.FirstOrDefault(z => z == x.ID) == default && $"{x.Species}{x.Form}".Equals(species));
+                matches = list.FindAll(x => !x.Traded && (species == "Shiny" ? x.Shiny : !x.Shiny) && (species == "Cherish" ? x.Ball == "Cherish" : x.Ball != "Cherish") && x.Species != "Ditto" && x.ID != TCInfo.Daycare1.ID && x.ID != TCInfo.Daycare2.ID && TCInfo.Favorites.FirstOrDefault(z => z == x.ID) == default && $"{x.Species}{x.Form}".Equals(species));
             }
-            else matches = TCInfo.Catches.TakeWhile(x => !x.Traded && !x.Shiny && x.Ball != "Cherish" && x.Species != "Ditto" && x.ID != TCInfo.Daycare1.ID && x.ID != TCInfo.Daycare2.ID && TCInfo.Favorites.FirstOrDefault(z => z == x.ID) == default);
+            else matches = list.FindAll(x => !x.Traded && !x.Shiny && x.Ball != "Cherish" && x.Species != "Ditto" && x.ID != TCInfo.Daycare1.ID && x.ID != TCInfo.Daycare2.ID && TCInfo.Favorites.FirstOrDefault(z => z == x.ID) == default);
 
             if (matches.Count() == 0)
             {
@@ -559,6 +561,11 @@ namespace SysBot.Pokemon.Discord
                     return;
                 }
             }
+            else
+            {
+                await Context.Message.Channel.SendMessageAsync("Invalid command.").ConfigureAwait(false);
+                return;
+            }
 
             TradeExtensions.UpdateUserInfo(TCInfo, InfoPath);
             var embed = new EmbedBuilder { Color = Color.DarkBlue };
@@ -618,8 +625,9 @@ namespace SysBot.Pokemon.Discord
             var newPath = $"{dir}\\{match.Path.Split('\\')[2].Replace(match.ID.ToString(), newID.ToString())}";
             var value = $"You gifted your {(match.Shiny ? "★" : "")}{match.Species}{match.Form} to {Context.Message.MentionedUsers.First().Username}.";
 
-            receivingUser.Catches.Add(new TradeExtensions.Catch { Ball = match.Ball, Egg = match.Egg, Form = match.Form, ID = newID, Shiny = match.Shiny, Species = match.Species, Path = newPath });
+            receivingUser.Catches.Add(new TradeExtensions.Catch { Ball = match.Ball, Egg = match.Egg, Form = match.Form, ID = newID, Shiny = match.Shiny, Species = match.Species, Path = newPath, Traded = false });
             TradeExtensions.UpdateUserInfo(receivingUser, InfoPath);
+            File.Move(match.Path, newPath);
             TCInfo.Catches.Remove(match);
             TradeExtensions.UpdateUserInfo(TCInfo, InfoPath);
             await EmbedUtil(embed, name, value).ConfigureAwait(false);
@@ -820,7 +828,7 @@ namespace SysBot.Pokemon.Discord
             var newname = (pkm.IsShiny ? "★" + index.ToString() : index.ToString()) + $"_{(Ball)pkm.Ball}" + " - " + speciesName + form  + $"{(pkm.IsEgg ? " (Egg)" : "")}" + ".pk8";
             var fn = Path.Combine(dir, Util.CleanFileName(newname));
             File.WriteAllBytes(fn, pkm.DecryptedPartyData);
-            TCInfo.Catches.Add(new TradeExtensions.Catch { Species = speciesName, Ball = ((Ball)pkm.Ball).ToString(), Egg = pkm.IsEgg, Form = form, ID = index, Path = fn, Shiny = pkm.IsShiny });
+            TCInfo.Catches.Add(new TradeExtensions.Catch { Species = speciesName, Ball = ((Ball)pkm.Ball).ToString(), Egg = pkm.IsEgg, Form = form, ID = index, Path = fn, Shiny = pkm.IsShiny, Traded = false });
         }
 
         private int Indexing(int[] array)
@@ -868,13 +876,16 @@ namespace SysBot.Pokemon.Discord
                 MigrateData();
 
             TCInfo = TradeExtensions.GetUserInfo(Context.User.Id, InfoPath);
-            var traded = TCInfo.Catches.FirstOrDefault(x => x.Traded == true);
+            var traded = TCInfo.Catches.ToList().FindAll(x => x.Traded);
             if (traded != default && TradeExtensions.TradeCordPath.FirstOrDefault(x => x.Contains(TCInfo.UserID.ToString())) == default)
             {
-                var tradedPath = Path.Combine($"TradeCord\\Backup\\{TCInfo.UserID}", traded.Path.Split('\\')[2]);
-                if (!File.Exists(tradedPath))
-                    traded.Traded = false;
-                else TCInfo.Catches.Remove(traded);
+                foreach (var trade in traded)
+                {
+                    var tradedPath = Path.Combine($"TradeCord\\Backup\\{TCInfo.UserID}", trade.Path.Split('\\')[2]);
+                    if (!File.Exists(tradedPath))
+                        trade.Traded = false;
+                    else TCInfo.Catches.Remove(trade);
+                }
                 TradeExtensions.UpdateUserInfo(TCInfo, InfoPath);
             }
         }
@@ -1261,7 +1272,7 @@ namespace SysBot.Pokemon.Discord
             if (hatched)
                 TCInfo.Dex.Add(TCRng.EggPKM.Species);
             DexMsg = caught || hatched ? " Registered to the Pokédex." : "";
-            if (TCInfo.Dex.Count == 664)
+            if (TCInfo.Dex.Count == 664 && TCInfo.DexCompletionCount < 5)
             {
                 TCInfo.Dex.Clear();
                 TCInfo.DexCompletionCount += 1;
