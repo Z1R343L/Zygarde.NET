@@ -1471,7 +1471,7 @@ namespace SysBot.Pokemon.Discord
             var embed = new EmbedBuilder
             { 
                 Author = author,
-                Title = $"You threw {(TCRng.CatchPKM.Ball == 2 ? "an" : "a")} {(Ball)TCRng.CatchPKM.Ball} Ball at a {(TCRng.CatchPKM.IsShiny ? "**shiny** wild **" + speciesName + form + "**" : "wild " + speciesName + form)}...",
+                Title = $"*You threw {(TCRng.CatchPKM.Ball == 2 ? "an" : "a")} {(Ball)TCRng.CatchPKM.Ball} Ball at a {(TCRng.CatchPKM.IsShiny ? "**shiny** wild **" + speciesName + form + "**" : "wild " + speciesName + form)}...*",
                 Color = (TCRng.CatchPKM.IsShiny && TCRng.CatchPKM.Ball == 16) || TCRng.CatchPKM.ShinyXor == 0 ? Color.Gold : TCRng.CatchPKM.ShinyXor <= 16 ? Color.LightOrange : Colors.Catch(),
                 ImageUrl = pokeImg 
             };
@@ -1505,7 +1505,7 @@ namespace SysBot.Pokemon.Discord
             { 
                 Author = author,
                 Color = Colors.Fail(),
-                Title = $"You threw {(ball == Ball.Ultra ? "an" : "a")} {(ball == Ball.Cherish ? Ball.Poke : ball)} Ball at a wild {(spookyRng >= 90 && imgRng != 3 ? "...whatever that thing is" : SpeciesName.GetSpeciesNameGeneration(TCRng.SpeciesRNG, 2, 8))}...",
+                Title = $"*You threw {(ball == Ball.Ultra ? "an" : "a")} {(ball == Ball.Cherish ? Ball.Poke : ball)} Ball at a wild {(spookyRng >= 90 && imgRng != 3 ? "...whatever that thing is" : SpeciesName.GetSpeciesNameGeneration(TCRng.SpeciesRNG, 2, 8))}...*",
                 ImageUrl = spookyRng >= 90 && imgRng == 1 ? imgGarf : spookyRng >= 90 && imgRng == 2 ? imgConk : "" 
             };
             

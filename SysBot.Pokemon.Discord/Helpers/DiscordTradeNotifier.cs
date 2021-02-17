@@ -118,7 +118,7 @@ namespace SysBot.Pokemon.Discord
                 x.Value = lines;
                 x.IsInline = false;
             });
-            var msg = $"{r.Seed:X16}";
+            var msg = "Results";
             if (Hub.Config.SeedCheck.PostResultToChannel && !Hub.Config.SeedCheck.PostResultToBoth)
                 Context.Channel.SendMessageAsync(Trader.Mention + " - " + msg, embed: embed.Build()).ConfigureAwait(false);
             else if (Hub.Config.SeedCheck.PostResultToBoth)
