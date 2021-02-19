@@ -1,17 +1,14 @@
 using Discord;
 using Discord.Commands;
-using PKHeX.Core;
-using Discord;
 using Discord.Rest;
-using Discord.Commands;
+using PKHeX.Core;
 using System;
 using System.IO;
 using System.Linq;
 using System.Diagnostics;
 using System.Threading.Tasks;
-using Newtonsoft.Json;
-using SysBot.Pokemon.Discord.Helpers;
 using System.Collections.Generic;
+using SysBot.Pokemon.Discord.Helpers;
 
 namespace SysBot.Pokemon.Discord
 {
@@ -437,7 +434,7 @@ namespace SysBot.Pokemon.Discord
                 TCInfo.Catches.Remove(val);
             }
 
-            UpdateUserInfo(TCInfo);
+            TradeExtensions.UpdateUserInfo(TCInfo, InfoPath);
 
             var author = new EmbedAuthorBuilder
             {
@@ -498,7 +495,7 @@ namespace SysBot.Pokemon.Discord
 
             File.Delete(match.Path);
             TCInfo.Catches.Remove(match);
-            UpdateUserInfo(TCInfo);
+            TradeExtensions.UpdateUserInfo(TCInfo, InfoPath);
             await Context.Message.Channel.SendMessageAsync(embed: embed.Build()).ConfigureAwait(false);
         }
 
@@ -626,7 +623,7 @@ namespace SysBot.Pokemon.Discord
                 return;
             }
 
-            UpdateUserInfo(TCInfo);
+            TradeExtensions.UpdateUserInfo(TCInfo, InfoPath);
 
             var author = new EmbedAuthorBuilder
             {
@@ -742,9 +739,9 @@ namespace SysBot.Pokemon.Discord
 
                 embed.WithFooter(footer);
             }
-            UpdateUserInfo(receivingUser);
+            TradeExtensions.UpdateUserInfo(receivingUser, InfoPath);
             TCInfo.Catches.Remove(match);
-            UpdateUserInfo(TCInfo);
+            TradeExtensions.UpdateUserInfo(TCInfo, InfoPath);
             await Context.Message.Channel.SendMessageAsync(embed: embed.Build()).ConfigureAwait(false);
         }
 
@@ -811,7 +808,7 @@ namespace SysBot.Pokemon.Discord
                 return;
             }
 
-            UpdateUserInfo(TCInfo);
+            TradeExtensions.UpdateUserInfo(TCInfo, InfoPath);
 
             var author = new EmbedAuthorBuilder
             {
