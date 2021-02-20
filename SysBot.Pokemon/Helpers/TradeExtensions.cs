@@ -1,9 +1,10 @@
 ﻿using PKHeX.Core;
 using PKHeX.Core.AutoMod;
+using Newtonsoft.Json;
 using System;
-using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Collections.Generic;
 
 namespace SysBot.Pokemon
 {
@@ -135,12 +136,12 @@ namespace SysBot.Pokemon
             public string Form { get; set; } = "";
             public bool Egg { get; set; }
             public string Path { get; set; } = "";
+            public bool Traded { get; set; }
         }
 
         public class TCUserInfo
         {
             public ulong UserID { get; set; }
-            public Catch? TradedPKM { get; set; }
             public int CatchCount { get; set; }
             public Daycare1 Daycare1 { get; set; } = new();
             public Daycare2 Daycare2 { get; set; } = new();
@@ -149,15 +150,15 @@ namespace SysBot.Pokemon
             public int TID { get; set; }
             public int SID { get; set; }
             public string Language { get; set; } = "";
-            public List<int> Dex { get; set; } = new();
+            public HashSet<int> Dex { get; set; } = new();
             public int DexCompletionCount { get; set; }
-            public List<int> Favorites { get; set; } = new();
-            public List<Catch> Catches { get; set; } = new();
+            public HashSet<int> Favorites { get; set; } = new();
+            public HashSet<Catch> Catches { get; set; } = new();
         }
 
         public class TCUserInfoRoot
         {
-            public List<TCUserInfo> Users { get; set; } = new();
+            public HashSet<TCUserInfo> Users { get; set; } = new();
         }
 
         public static bool ShinyLockCheck(int species, string ball, bool form)
@@ -236,8 +237,8 @@ namespace SysBot.Pokemon
 
         public static PKM EggRngRoutine(TCUserInfo info, string trainerInfo, int evo1, int evo2, bool star, bool square)
         {
-            var pkm1 = PKMConverter.GetPKMfromBytes(File.ReadAllBytes(info.Catches.Find(x => x.ID == info.Daycare1.ID).Path));
-            var pkm2 = PKMConverter.GetPKMfromBytes(File.ReadAllBytes(info.Catches.Find(x => x.ID == info.Daycare2.ID).Path));
+            var pkm1 = PKMConverter.GetPKMfromBytes(File.ReadAllBytes(info.Catches.FirstOrDefault(x => x.ID == info.Daycare1.ID).Path));
+            var pkm2 = PKMConverter.GetPKMfromBytes(File.ReadAllBytes(info.Catches.FirstOrDefault(x => x.ID == info.Daycare2.ID).Path));
             if (pkm1 == null || pkm2 == null)
                 return new PK8();
             
@@ -257,7 +258,7 @@ namespace SysBot.Pokemon
                 "Indeedee" => _ = specificEgg && dittoLoc == 1 ? FormOutput(876, pkm2.Form, out _) : specificEgg && dittoLoc == 2 ? FormOutput(876, pkm1.Form, out _) : FormOutput(876, Random.Next(2), out _),
                 "Nidoran" => _ = specificEgg && dittoLoc == 1 ? (evo2 == 32 ? "-M" : "-F") : specificEgg && dittoLoc == 2 ? (evo1 == 32 ? "-M" : "-F") : (Random.Next(2) == 0 ? "-M" : "-F"),
                 "Meowth" => _ = FormOutput(speciesRngID, specificEgg && (pkm1.Species == 863 || pkm2.Species == 863) ? 2 : specificEgg && dittoLoc == 1 ? pkm2.Form : specificEgg && dittoLoc == 2 ? pkm1.Form : Random.Next(forms.Length), out _),
-                "Sinistea" => "",
+                "Sinistea" or "Milcery" => "",
                 _ => FormOutput(speciesRngID, specificEgg && pkm1.Form == pkm2.Form ? pkm1.Form : specificEgg && dittoLoc == 1 ? pkm2.Form : specificEgg && dittoLoc == 2 ? pkm1.Form : Random.Next(forms.Length), out _),
             };
 
@@ -464,22 +465,26 @@ namespace SysBot.Pokemon
         public static PKM LegalityAttempt(PKM pkm)
         {
             var la = new LegalityAnalysis(pkm);
-            if (!la.Valid)
+            if (!la.Valid && pkm.Version != (int)GameVersion.GO)
             {
                 var list = la.Results.ToList().FindAll(x => x.Judgement == Severity.Invalid);
                 foreach (var invalid in list)
                 {
                     switch (invalid.Identifier)
                     {
+                        case CheckIdentifier.GameOrigin: _ = pkm.Version == pkm.MinGameID ? pkm.Version += 1 : pkm.Version -= 1; break;
                         case CheckIdentifier.Form: pkm.HeldItem = pkm.Species == (int)Species.Giratina && pkm.Form == 1 ? pkm.HeldItem = 112 : pkm.HeldItem; break;
                         case CheckIdentifier.Nickname: CommonEdits.SetDefaultNickname(pkm, la); break;
-                        case CheckIdentifier.Memory: pkm.CurrentHandler = pkm.CurrentHandler == 0 ? pkm.CurrentHandler = 1 : pkm.CurrentHandler = 0; break;
+                        case CheckIdentifier.Memory: pkm.CurrentHandler = pkm.CurrentHandler == 0 ? pkm.CurrentHandler = 1 : pkm.CurrentHandler = 0; pkm.SetHandlerandMemory(AutoLegalityWrapper.GetTrainerInfo(8)); pkm.SetFriendship(la.EncounterMatch); break;
                         case CheckIdentifier.Ability: pkm.AbilityNumber = pkm.AbilityNumber == 4 ? pkm.AbilityNumber = 1 : pkm.AbilityNumber; pkm.RefreshAbility(pkm.AbilityNumber); break;
-                        case CheckIdentifier.Language: pkm.Language = pkm.Language == 2 ? pkm.Language = 1 : pkm.Language; pkm.ClearNickname(); break;
+                        case CheckIdentifier.Language: pkm.Language = pkm.Language == 0 ? 2 : pkm.Language == 2 ? 1 : pkm.Language; pkm.ClearNickname(); break;
                         case CheckIdentifier.Shiny: _ = pkm.ShinyXor == 0 ? CommonEdits.SetShiny(pkm, Shiny.AlwaysStar) : pkm.ShinyXor <= 16 ? CommonEdits.SetShiny(pkm, Shiny.AlwaysSquare) : CommonEdits.SetShiny(pkm, Shiny.Never); break;
                     };
                 }
             }
+            else if (pkm.Version == (int)GameVersion.GO && !la.Valid)
+                pkm = pkm.Legalize();
+
             pkm = TrashBytes(pkm, la);
             pkm.RefreshChecksum();
             return pkm;
@@ -495,6 +500,90 @@ namespace SysBot.Pokemon
                 return (PK8)mgPkm;
             }
             else return new();
+        }
+
+        private static void AddNewUser(TCUserInfoRoot root, ulong id, string file)
+        {
+            root.Users.Add(new TCUserInfo { UserID = id });
+            SerializeInfo(root, file);
+        }
+
+        public static T? GetRoot<T>(string file)
+        {
+            JsonSerializer serializer = new();
+            using TextReader reader = File.OpenText(file);
+            T? root = (T?)serializer.Deserialize(reader, typeof(T));
+            reader.Close();
+            return root;
+        }
+
+        public static TCUserInfo GetUserInfo(ulong id, string file)
+        {
+            var root = GetRoot<TCUserInfoRoot>(file);
+            var user = root?.Users.FirstOrDefault(x => x.UserID == id);
+            if (root == null)
+            {
+                root = new();
+                AddNewUser(root, id, file);
+            }
+            else if (user == null)
+                AddNewUser(root, id, file);
+
+            return user ?? root.Users.FirstOrDefault(x => x.UserID == id);
+        }
+
+        public static void UpdateUserInfo(TCUserInfo info, string file)
+        {
+            using TextReader reader = File.OpenText(file);
+            reader.Close();
+            var root = GetRoot<TCUserInfoRoot>(file);
+            if (info != null)
+            {
+                if (root == null)
+                {
+                    root = new();
+                    root.Users.Add(info);
+                }
+                else
+                {
+                    var user = root.Users.FirstOrDefault(x => x.UserID == info.UserID);
+                    root.Users.Remove(user);
+                    root.Users.Add(info);
+                }
+                SerializeInfo(root, file);
+            }
+        }
+
+        public static void SerializeInfo(object? root, string filePath)
+        {
+            JsonSerializer serializer = new();
+            using StreamWriter writer = File.CreateText(filePath);
+            serializer.Formatting = Formatting.Indented;
+            serializer.Serialize(writer, root);
+        }
+
+        public static void TradeStatusUpdate(string id, bool cancelled = false)
+        {
+            if (!cancelled)
+            {
+                var origPath = TradeCordPath.FirstOrDefault(x => x.Contains(id));
+                var tradedPath = Path.Combine($"TradeCord\\Backup\\{id}", origPath.Split('\\')[2]);
+                try
+                {
+                    File.Move(origPath, tradedPath);
+                }
+                catch (IOException)
+                {
+                    File.Move(origPath, tradedPath.Insert(tradedPath.IndexOf(".") - 1, "ex"));
+                }
+            }
+
+            var entries = TradeCordPath.FindAll(x => x.Contains(id));
+            if (entries.Count > 0)
+            {
+                foreach (var entry in entries)
+                    TradeCordPath.Remove(entry);
+            }
         }
     }
 }

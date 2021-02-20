@@ -1,14 +1,13 @@
-﻿using Discord;
-using Discord.Commands;
+﻿using PKHeX.Core;
+using Discord;
 using Discord.Rest;
-using PKHeX.Core;
+using Discord.Commands;
 using System;
-using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Diagnostics;
 using System.Threading.Tasks;
-using Newtonsoft.Json;
+using System.Collections.Generic;
 
 namespace SysBot.Pokemon.Discord
 {
@@ -18,6 +17,7 @@ namespace SysBot.Pokemon.Discord
         private static TradeQueueInfo<PK8> Info => SysCordInstance.Self.Hub.Queues.Info;
         private readonly TradeExtensions.TCRng TCRng = new();
         private TradeExtensions.TCUserInfo TCInfo = new();
+        private readonly string InfoPath = "TradeCord\\UserInfo.json";
         private MysteryGift? MGRngEvent = default;
         private string EggEmbedMsg = string.Empty;
         private string EventPokeType = string.Empty;
@@ -229,7 +229,7 @@ namespace SysBot.Pokemon.Discord
 
             TradeCordCooldown(user);
             if (egg || TCRng.CatchRNG >= 100 - Info.Hub.Config.TradeCord.CatchRate)
-                UpdateUserInfo(TCInfo);
+                TradeExtensions.UpdateUserInfo(TCInfo, InfoPath);
         }
 
         [Command("TradeCord")]
@@ -245,14 +245,14 @@ namespace SysBot.Pokemon.Discord
                 return;
             }
 
-            var match = TCInfo.Catches.Find(x => x.ID == _id);
+            var match = TCInfo.Catches.FirstOrDefault(x => x.ID == _id && !x.Traded);
             if (match == null)
             {
                 await Context.Message.Channel.SendMessageAsync("There is no Pokémon with this ID.").ConfigureAwait(false);
                 return;
             }
 
-            var dcfavCheck = TCInfo.Daycare1.ID == _id || TCInfo.Daycare2.ID == _id || TCInfo.Favorites.Find(x => x == _id) != default;
+            var dcfavCheck = TCInfo.Daycare1.ID == _id || TCInfo.Daycare2.ID == _id || TCInfo.Favorites.FirstOrDefault(x => x == _id) != default;
             if (dcfavCheck)
             {
                 await Context.Message.Channel.SendMessageAsync("Please remove your Pokémon from favorites and daycare before trading!").ConfigureAwait(false);
@@ -273,10 +273,9 @@ namespace SysBot.Pokemon.Discord
                 return;
             }
 
-            TCInfo.TradedPKM = match;
-            TCInfo.Catches.Remove(match);
+            match.Traded = true;
             TradeExtensions.TradeCordPath.Add(match.Path);
-            UpdateUserInfo(TCInfo);
+            TradeExtensions.UpdateUserInfo(TCInfo, InfoPath);
             var sig = Context.User.GetFavor();
             await Context.AddToQueueAsync(code, Context.User.Username, sig, (PK8)pkm, PokeRoutineType.TradeCord, PokeTradeType.TradeCord).ConfigureAwait(false);
         }
@@ -306,16 +305,17 @@ namespace SysBot.Pokemon.Discord
                 return;
             }
 
-            List<TradeExtensions.Catch> matches = new();
+            IEnumerable<TradeExtensions.Catch> matches;
+            var list = TCInfo.Catches.ToList();
             if (filters != "" && !filters.Contains(" ") && !filters.Contains("shiny")) // Look for name and ball
-                matches = TCInfo.Catches.FindAll(x => filters.Contains(x.Ball.ToLower()) && (name == "Shinies" ? x.Shiny : name.Contains(x.Species + x.Form)));
+                matches = list.FindAll(x => filters.Contains(x.Ball.ToLower()) && (name == "Shinies" ? x.Shiny : name.Contains(x.Species + x.Form)) && !x.Traded);
             else if (filters != "" && !filters.Contains(" ") && filters.Contains("shiny")) // Look for name and shiny
-                matches = TCInfo.Catches.FindAll(x => x.Shiny && name.Contains(x.Species + x.Form));
+                matches = list.FindAll(x => x.Shiny && name.Contains(x.Species + x.Form) && !x.Traded);
             else if (filters != "" && filters.Contains(" ")) // Look for name, ball, and shiny
-                matches = TCInfo.Catches.FindAll(x => x.Shiny && filters.Contains(x.Ball.ToLower()) && name.Contains(x.Species + x.Form));
-            else matches = TCInfo.Catches.FindAll(x => name == "All" ? x.Species != "" : name == "Egg" ? x.Egg : name == "Shinies" ? x.Shiny : x.Ball == name || x.Species == name || (x.Species + x.Form == name) || x.Form.Replace("-", "") == name);
+                matches = list.FindAll(x => x.Shiny && filters.Contains(x.Ball.ToLower()) && name.Contains(x.Species + x.Form) && !x.Traded);
+            else matches = list.FindAll(x => (name == "All" ? x.Species != "" : name == "Egg" ? x.Egg : name == "Shinies" ? x.Shiny : x.Ball == name || x.Species == name || (x.Species + x.Form == name) || x.Form.Replace("-", "") == name) && !x.Traded);
 
-            List<string> count = new(), countSh = new();
+            HashSet<string> count = new(), countSh = new();
             if (name == "Shinies")
             {
                 foreach (var result in matches)
@@ -358,7 +358,7 @@ namespace SysBot.Pokemon.Discord
                 return;
             }
 
-            var match = TCInfo.Catches.Find(x => x.ID == _id);
+            var match = TCInfo.Catches.FirstOrDefault(x => x.ID == _id && !x.Traded);
             if (match == null)
             {
                 await Context.Message.Channel.SendMessageAsync("Could not find this ID.").ConfigureAwait(false);
@@ -387,19 +387,20 @@ namespace SysBot.Pokemon.Discord
         public async Task MassRelease([Remainder] string species = "")
         {
             TradeCordParanoiaChecks(Context);
-            List<TradeExtensions.Catch> matches = new();
+            IEnumerable<TradeExtensions.Catch> matches;
+            var list = TCInfo.Catches.ToList();
             if (species.ToLower() == "cherish")
-                matches = TCInfo.Catches.FindAll(x => !x.Shiny && x.Ball != "Cherish" && x.Species != "Ditto" && x.ID != TCInfo.Daycare1.ID && x.ID != TCInfo.Daycare2.ID && TCInfo.Favorites.Find(z => z == x.ID) == default);
+                matches = list.FindAll(x => !x.Traded && !x.Shiny && x.Ball == "Cherish" && x.Species != "Ditto" && x.ID != TCInfo.Daycare1.ID && x.ID != TCInfo.Daycare2.ID && TCInfo.Favorites.FirstOrDefault(z => z == x.ID) == default);
             else if (species.ToLower() == "shiny")
-                matches = TCInfo.Catches.FindAll(x => x.Shiny && x.Ball != "Cherish" && x.Species != "Ditto" && x.ID != TCInfo.Daycare1.ID && x.ID != TCInfo.Daycare2.ID && TCInfo.Favorites.Find(z => z == x.ID) == default);
+                matches = list.FindAll(x => !x.Traded && x.Shiny && x.Ball != "Cherish" && x.Species != "Ditto" && x.ID != TCInfo.Daycare1.ID && x.ID != TCInfo.Daycare2.ID && TCInfo.Favorites.FirstOrDefault(z => z == x.ID) == default);
             else if (species != "")
             {
                 species = ListNameSanitize(species);
-                matches = TCInfo.Catches.FindAll(x => (species == "Shiny" ? x.Shiny : !x.Shiny) && (species == "Cherish" ? x.Ball == "Cherish" : x.Ball != "Cherish") && x.Species != "Ditto" && x.ID != TCInfo.Daycare1.ID && x.ID != TCInfo.Daycare2.ID && TCInfo.Favorites.Find(z => z == x.ID) == default && $"{x.Species}{x.Form}".Equals(species));
+                matches = list.FindAll(x => !x.Traded && (species == "Shiny" ? x.Shiny : !x.Shiny) && (species == "Cherish" ? x.Ball == "Cherish" : x.Ball != "Cherish") && x.Species != "Ditto" && x.ID != TCInfo.Daycare1.ID && x.ID != TCInfo.Daycare2.ID && TCInfo.Favorites.FirstOrDefault(z => z == x.ID) == default && $"{x.Species}{x.Form}".Equals(species));
             }
-            else matches = TCInfo.Catches.FindAll(x => !x.Shiny && x.Ball != "Cherish" && x.Species != "Ditto" && x.ID != TCInfo.Daycare1.ID && x.ID != TCInfo.Daycare2.ID && TCInfo.Favorites.Find(z => z == x.ID) == default);
+            else matches = list.FindAll(x => !x.Traded && !x.Shiny && x.Ball != "Cherish" && x.Species != "Ditto" && x.ID != TCInfo.Daycare1.ID && x.ID != TCInfo.Daycare2.ID && TCInfo.Favorites.FirstOrDefault(z => z == x.ID) == default);
 
-            if (matches.Count == 0)
+            if (matches.Count() == 0)
             {
                 await Context.Message.Channel.SendMessageAsync(species == "" ? "Cannot find any more non-shiny, non-Ditto, non-favorite, non-event Pokémon to release." : "Cannot find anything that could be released with the specified criteria.").ConfigureAwait(false);
                 return;
@@ -411,7 +412,7 @@ namespace SysBot.Pokemon.Discord
                 TCInfo.Catches.Remove(val);
             }
 
-            UpdateUserInfo(TCInfo);
+            TradeExtensions.UpdateUserInfo(TCInfo, InfoPath);
             var embed = new EmbedBuilder { Color = Color.DarkBlue };
             var name = $"{Context.User.Username}'s Mass Release";
             var value = species == "" ? "Every non-shiny Pokémon was released, excluding Ditto, favorites, events, and those in daycare." : $"Every {(species.ToLower() == "shiny" ? "shiny Pokémon" : species.ToLower() == "cherish" ? "event Pokémon" : $"non-shiny {species}")} was released, excluding favorites{(species.ToLower() == "cherish" ? "" : ", events,")} and those in daycare.";
@@ -431,14 +432,14 @@ namespace SysBot.Pokemon.Discord
                 return;
             }
 
-            var match = TCInfo.Catches.Find(x => x.ID == _id);
+            var match = TCInfo.Catches.FirstOrDefault(x => x.ID == _id && !x.Traded);
             if (match == null)
             {
                 await Context.Message.Channel.SendMessageAsync("Cannot find this Pokémon.").ConfigureAwait(false);
                 return;
             }
 
-            if (TCInfo.Daycare1.ID == _id || TCInfo.Daycare2.ID == _id || TCInfo.Favorites.Find(x => x == _id) != default)
+            if (TCInfo.Daycare1.ID == _id || TCInfo.Daycare2.ID == _id || TCInfo.Favorites.FirstOrDefault(x => x == _id) != default)
             {
                 await Context.Message.Channel.SendMessageAsync("Cannot release a Pokémon in daycare or favorites.").ConfigureAwait(false);
                 return;
@@ -449,7 +450,7 @@ namespace SysBot.Pokemon.Discord
             var value = $"You release your {(match.Shiny ? "★" : "")}{match.Species}{match.Form}.";
             File.Delete(match.Path);
             TCInfo.Catches.Remove(match);
-            UpdateUserInfo(TCInfo);
+            TradeExtensions.UpdateUserInfo(TCInfo, InfoPath);
             await EmbedUtil(embed, name, value).ConfigureAwait(false);
         }
 
@@ -498,7 +499,7 @@ namespace SysBot.Pokemon.Discord
             string speciesString = string.Empty;
             bool deposit = action == "d" || action == "deposit";
             bool withdraw = action == "w" || action == "withdraw";
-            var match = deposit ? TCInfo.Catches.Find(x => x.ID == int.Parse(id)) : null;
+            var match = deposit ? TCInfo.Catches.FirstOrDefault(x => x.ID == int.Parse(id) && !x.Traded) : null;
             if (deposit && match == null)
             {
                 await Context.Message.Channel.SendMessageAsync("There is no Pokémon with this ID.").ConfigureAwait(false);
@@ -560,8 +561,13 @@ namespace SysBot.Pokemon.Discord
                     return;
                 }
             }
+            else
+            {
+                await Context.Message.Channel.SendMessageAsync("Invalid command.").ConfigureAwait(false);
+                return;
+            }
 
-            UpdateUserInfo(TCInfo);
+            TradeExtensions.UpdateUserInfo(TCInfo, InfoPath);
             var embed = new EmbedBuilder { Color = Color.DarkBlue };
             var name = $"{Context.User.Username}'s Daycare {(deposit ? "Deposit" : "Withdraw")}";
             var results = deposit && match != null ? $"Deposited your {(match.Shiny ? "★" : "")}{match.Species}{match.Form}({match.Ball}) to daycare!" : $"You withdrew your {speciesString} from the daycare.";
@@ -591,7 +597,7 @@ namespace SysBot.Pokemon.Discord
                 return;
             }
 
-            var match = TCInfo.Catches.Find(x => x.ID == int.Parse(id));
+            var match = TCInfo.Catches.FirstOrDefault(x => x.ID == int.Parse(id) && !x.Traded);
             var dir = Path.Combine("TradeCord", Context.Message.MentionedUsers.First().Id.ToString());
             if (match == null)
             {
@@ -601,29 +607,29 @@ namespace SysBot.Pokemon.Discord
             else if (!Directory.Exists(dir))
                 Directory.CreateDirectory(dir);
 
-            var dcfavCheck = TCInfo.Daycare1.ID == int.Parse(id) || TCInfo.Daycare2.ID == int.Parse(id) || TCInfo.Favorites.Find(x => x == int.Parse(id)) != default;
+            var dcfavCheck = TCInfo.Daycare1.ID == int.Parse(id) || TCInfo.Daycare2.ID == int.Parse(id) || TCInfo.Favorites.FirstOrDefault(x => x == int.Parse(id)) != default;
             if (dcfavCheck)
             {
                 await Context.Message.Channel.SendMessageAsync("Please remove your Pokémon from favorites and daycare before gifting!").ConfigureAwait(false);
                 return;
             }
 
-            var receivingUser = GetUserInfo(Context.Message.MentionedUsers.First().Id);
-            List<int> newIDParse = new();
-            for (int i = 0; i < receivingUser.Catches.Count; i++)
-                newIDParse.Add(receivingUser.Catches[i].ID);
+            var receivingUser = TradeExtensions.GetUserInfo(Context.Message.MentionedUsers.First().Id, InfoPath);
+            HashSet<int> newIDParse = new();
+            foreach (var caught in receivingUser.Catches)
+                newIDParse.Add(caught.ID);
 
             var newID = Indexing(newIDParse.OrderBy(x => x).ToArray());
             var embed = new EmbedBuilder { Color = Color.Purple };
             var name = $"{Context.User.Username}'s Gift";
             var newPath = $"{dir}\\{match.Path.Split('\\')[2].Replace(match.ID.ToString(), newID.ToString())}";
             var value = $"You gifted your {(match.Shiny ? "★" : "")}{match.Species}{match.Form} to {Context.Message.MentionedUsers.First().Username}.";
-            File.Move(match.Path, newPath);
 
-            receivingUser.Catches.Add(new TradeExtensions.Catch { Ball = match.Ball, Egg = match.Egg, Form = match.Form, ID = newID, Shiny = match.Shiny, Species = match.Species, Path = newPath });
-            UpdateUserInfo(receivingUser);
+            receivingUser.Catches.Add(new TradeExtensions.Catch { Ball = match.Ball, Egg = match.Egg, Form = match.Form, ID = newID, Shiny = match.Shiny, Species = match.Species, Path = newPath, Traded = false });
+            TradeExtensions.UpdateUserInfo(receivingUser, InfoPath);
+            File.Move(match.Path, newPath);
             TCInfo.Catches.Remove(match);
-            UpdateUserInfo(TCInfo);
+            TradeExtensions.UpdateUserInfo(TCInfo, InfoPath);
             await EmbedUtil(embed, name, value).ConfigureAwait(false);
         }
 
@@ -690,7 +696,7 @@ namespace SysBot.Pokemon.Discord
                 return;
             }
 
-            UpdateUserInfo(TCInfo);
+            TradeExtensions.UpdateUserInfo(TCInfo, InfoPath);
             var embed = new EmbedBuilder { Color = Color.DarkBlue };
             var name = $"{Context.User.Username}'s Trainer Info";
             var value = $"\nYou've set your trainer info as the following: \n**OT:** {TCInfo.OTName}\n**OTGender:** {TCInfo.OTGender}\n**TID:** {TCInfo.TID}\n**SID:** {TCInfo.SID}\n**Language:** {TCInfo.Language}";
@@ -730,7 +736,7 @@ namespace SysBot.Pokemon.Discord
             List<string> names = new();
             foreach (var fav in TCInfo.Favorites)
             {
-                var match = TCInfo.Catches.Find(x => x.ID == fav);
+                var match = TCInfo.Catches.FirstOrDefault(x => x.ID == fav);
                 names.Add($"[ID: {match.ID}] {(match.Shiny ? "★" : "")}{match.Species}{match.Form} ({match.Ball} Ball)");
             }
 
@@ -752,14 +758,14 @@ namespace SysBot.Pokemon.Discord
                 return;
             }
 
-            var match = TCInfo.Catches.Find(x => x.ID == _id);
+            var match = TCInfo.Catches.FirstOrDefault(x => x.ID == _id && !x.Traded);
             if (match == null)
             {
                 await Context.Message.Channel.SendMessageAsync("Cannot find this Pokémon.").ConfigureAwait(false);
                 return;
             }
 
-            var fav = TCInfo.Favorites.Find(x => x == _id);
+            var fav = TCInfo.Favorites.FirstOrDefault(x => x == _id);
             if (fav == default)
             {
                 TCInfo.Favorites.Add(_id);
@@ -770,7 +776,7 @@ namespace SysBot.Pokemon.Discord
                 TCInfo.Favorites.Remove(fav);
                 await Context.Message.Channel.SendMessageAsync($"{Context.User.Username}, removed your {(match.Shiny ? "★" : "")}{match.Species}{match.Form} from favorites!").ConfigureAwait(false);
             }
-            UpdateUserInfo(TCInfo);
+            TradeExtensions.UpdateUserInfo(TCInfo, InfoPath);
         }
 
         [Command("TradeCordDex")]
@@ -799,7 +805,7 @@ namespace SysBot.Pokemon.Discord
                     missing.Add(SpeciesName.GetSpeciesNameGeneration(entry, 2, 8));
 
                 missing = missing.Distinct().ToList();
-                value = string.Join(",", missing.OrderBy(x => x));
+                value = string.Join(", ", missing.OrderBy(x => x));
             }
             await ListUtil(name, value).ConfigureAwait(false);
         }
@@ -822,7 +828,7 @@ namespace SysBot.Pokemon.Discord
             var newname = (pkm.IsShiny ? "★" + index.ToString() : index.ToString()) + $"_{(Ball)pkm.Ball}" + " - " + speciesName + form  + $"{(pkm.IsEgg ? " (Egg)" : "")}" + ".pk8";
             var fn = Path.Combine(dir, Util.CleanFileName(newname));
             File.WriteAllBytes(fn, pkm.DecryptedPartyData);
-            TCInfo.Catches.Add(new TradeExtensions.Catch { Species = speciesName, Ball = ((Ball)pkm.Ball).ToString(), Egg = pkm.IsEgg, Form = form, ID = index, Path = fn, Shiny = pkm.IsShiny });
+            TCInfo.Catches.Add(new TradeExtensions.Catch { Species = speciesName, Ball = ((Ball)pkm.Ball).ToString(), Egg = pkm.IsEgg, Form = form, ID = index, Path = fn, Shiny = pkm.IsShiny, Traded = false });
         }
 
         private int Indexing(int[] array)
@@ -867,103 +873,20 @@ namespace SysBot.Pokemon.Discord
             }
 
             if (!File.Exists($"TradeCord\\UserInfo.json"))
+                MigrateData();
+
+            TCInfo = TradeExtensions.GetUserInfo(Context.User.Id, InfoPath);
+            var traded = TCInfo.Catches.ToList().FindAll(x => x.Traded);
+            var tradeSignal = TradeExtensions.TradeCordPath.FirstOrDefault(x => x.Contains(TCInfo.UserID.ToString()));
+            if (traded.Count != 0 && tradeSignal == default)
             {
-                File.Create($"TradeCord\\UserInfo.json").Close();
-                var files = Directory.GetFiles("TradeCord");
-                TradeExtensions.TCUserInfoRoot jobject = new();
-                var dcPkm1 = new TradeExtensions.Daycare1 { };
-                var dcPkm2 = new TradeExtensions.Daycare2 { };
-                for (int i = 0; i < files.Length; i++)
+                foreach (var trade in traded)
                 {
-                    if (files[i].Contains(".txt"))
-                    {
-                        try
-                        {
-                            var info = File.ReadAllText(files[i]).Split(',').ToList();
-                            while (info.Count < 8)
-                                info.Add("0");
-
-                            bool dc1 = info[1] != "0-0" && info[1] != "0";
-                            bool dc2 = info[2] != "0-0" && info[2] != "0";
-                            info[1] = info[1].Contains("★") ? info[1].Replace("★_", "") : info[1];
-                            info[2] = info[2].Contains("★") ? info[2].Replace("★_", "") : info[2];
-                            var id1 = dc1 ? int.Parse(info[1].Split('_')[0]) : 0;
-                            var id2 = dc2 ? int.Parse(info[2].Split('_')[0]) : 0;
-                            var userid = files[i].Split('\\')[1].Split('.')[0];
-                            List<int> favlist = new();
-                            if (info.Count > 8)
-                            {
-                                for (int a = 8; a < info.Count; a++)
-                                {
-                                    if (info[a].Contains("★"))
-                                        info[a] = info[a].Replace("★", "");
-                                    favlist.Add(int.Parse(info[a]));
-                                }
-                            }
-
-                            List<TradeExtensions.Catch> catches = new();
-                            List<int> dex = new();
-                            foreach (var file in Directory.GetFiles($"TradeCord\\{userid}"))
-                            {
-                                var basestring = file.Split('\\')[2].Split('.')[0];
-                                if (basestring.Contains("★"))
-                                    basestring = basestring.Replace("★", "");
-
-                                var id = int.Parse(basestring.Contains("_") ? basestring.Split('_')[0] : basestring.Split(' ')[0]);
-                                var pkm = PKMConverter.GetPKMfromBytes(File.ReadAllBytes(file));
-                                if (pkm == null)
-                                    pkm = PKMConverter.GetBlank(typeof(PK8));
-
-                                if (!dex.Contains(pkm.Species))
-                                    dex.Add(pkm.Species);
-
-                                var form = TradeExtensions.FormOutput(pkm.Species, pkm.Form, out _);
-                                catches.Add(new TradeExtensions.Catch { ID = id, Ball = $"{(Ball)pkm.Ball}", Egg = pkm.IsEgg, Form = form, Shiny = pkm.IsShiny, Species = $"{SpeciesName.GetSpeciesNameGeneration(pkm.Species, 2, 8)}", Path = file });
-                                if (dc1 && id1 == id)
-                                    dcPkm1 = new TradeExtensions.Daycare1 { Ball = pkm.Ball, Form = TradeExtensions.FormOutput(pkm.Species, pkm.Form, out _), Species = pkm.Species, Shiny = pkm.IsShiny, ID = id1 };
-                                else if (dc2 && id2 == id)
-                                    dcPkm2 = new TradeExtensions.Daycare2 { Ball = pkm.Ball, Form = TradeExtensions.FormOutput(pkm.Species, pkm.Form, out _), Species = pkm.Species, Shiny = pkm.IsShiny, ID = id2 };
-                            }
-
-                            jobject.Users.Add(new TradeExtensions.TCUserInfo
-                            {
-                                UserID = ulong.Parse(userid),
-                                TradedPKM = null,
-                                CatchCount = int.TryParse(info[0], out int count) ? count : 0,
-                                Daycare1 = dc1 ? dcPkm1 : new TradeExtensions.Daycare1 { },
-                                Daycare2 = dc2 ? dcPkm2 : new TradeExtensions.Daycare2 { },
-                                OTName = int.TryParse(info[3], out _) ? "" : info[3],
-                                OTGender = int.TryParse(info[4], out _) ? "" : info[4],
-                                TID = int.TryParse(info[5], out int tid) ? tid : 0,
-                                SID = int.TryParse(info[6], out int sid) ? sid : 0,
-                                Language = int.TryParse(info[7], out _) ? "" : info[7],
-                                Dex = dex,
-                                Favorites = favlist,
-                                Catches = catches
-                            });
-
-                            using StreamWriter writer = File.CreateText("TradeCord\\UserInfo.json");
-                            JsonSerializer serializer = new();
-                            serializer.Formatting = Formatting.Indented;
-                            serializer.Serialize(writer, jobject);
-                            File.Move(files[i], $"TradeCord\\Backup\\{userid}.txt");
-                        }catch(Exception ex)
-                        {
-                            Base.EchoUtil.Echo(ex.Message + "\n" + ex.StackTrace + "\n" + ex.InnerException);
-                        }
-                    }
+                    if (!File.Exists(trade.Path))
+                        TCInfo.Catches.Remove(trade);
+                    else trade.Traded = false;
                 }
-            }
-
-            TCInfo = GetUserInfo(Context.User.Id);
-            if (TCInfo.TradedPKM != null && TradeExtensions.TradeCordPath.FirstOrDefault(x => x.Contains(TCInfo.UserID.ToString())) == default)
-            {
-                var tradedPath = Path.Combine($"TradeCord\\Backup\\{TCInfo.UserID}", TCInfo.TradedPKM.Path.Split('\\')[2]);
-                if (!File.Exists(tradedPath))
-                    TCInfo.Catches.Add(TCInfo.TradedPKM);
-
-                TCInfo.TradedPKM = null;
-                UpdateUserInfo(TCInfo);
+                TradeExtensions.UpdateUserInfo(TCInfo, InfoPath);
             }
         }
 
@@ -1022,6 +945,8 @@ namespace SysBot.Pokemon.Discord
             {
                 var split = name.Split(' ');
                 name = split[0] + " " + split[1].Substring(0, 1).ToUpper() + split[1].Substring(1).ToLower();
+                if (name.Contains("-"))
+                    name = name.Split('-')[0] + "-" + name.Split('-')[1].Substring(0, 1).ToUpper() + name.Split('-')[1].Substring(1);
             }
 
             return name;
@@ -1347,7 +1272,7 @@ namespace SysBot.Pokemon.Discord
             if (hatched)
                 TCInfo.Dex.Add(TCRng.EggPKM.Species);
             DexMsg = caught || hatched ? " Registered to the Pokédex." : "";
-            if (TCInfo.Dex.Count == 664)
+            if (TCInfo.Dex.Count == 664 && TCInfo.DexCompletionCount < 5)
             {
                 TCInfo.Dex.Clear();
                 TCInfo.DexCompletionCount += 1;
@@ -1355,49 +1280,89 @@ namespace SysBot.Pokemon.Discord
             }
         }
 
-        private TradeExtensions.TCUserInfo GetUserInfo(ulong id)
+        private void MigrateData()
         {
-            var root = GetUserRoot();
-            var user = root?.Users.FirstOrDefault(x => x.UserID == id);
-            if (user == null)
+            File.Create(InfoPath).Close();
+            var files = Directory.GetFiles("TradeCord");
+            TradeExtensions.TCUserInfoRoot jobject = new();
+            var dcPkm1 = new TradeExtensions.Daycare1 { };
+            var dcPkm2 = new TradeExtensions.Daycare2 { };
+            for (int i = 0; i < files.Length; i++)
             {
-                if (root == null)
-                    return new TradeExtensions.TCUserInfo();
-                else
+                if (files[i].Contains(".txt"))
                 {
-                    root.Users.Add(new TradeExtensions.TCUserInfo { UserID = id });
-                    using StreamWriter writer = File.CreateText("TradeCord\\UserInfo.json");
-                    JsonSerializer serializer = new();
-                    serializer.Formatting = Formatting.Indented;
-                    serializer.Serialize(writer, root);
-                    return root.Users.FirstOrDefault(x => x.UserID == id);
+                    try
+                    {
+                        var info = File.ReadAllText(files[i]).Split(',').ToList();
+                        while (info.Count < 8)
+                            info.Add("0");
+
+                        bool dc1 = info[1] != "0-0" && info[1] != "0";
+                        bool dc2 = info[2] != "0-0" && info[2] != "0";
+                        info[1] = info[1].Contains("★") ? info[1].Replace("★_", "") : info[1];
+                        info[2] = info[2].Contains("★") ? info[2].Replace("★_", "") : info[2];
+                        var id1 = dc1 ? int.Parse(info[1].Split('_')[0]) : 0;
+                        var id2 = dc2 ? int.Parse(info[2].Split('_')[0]) : 0;
+                        var userid = files[i].Split('\\')[1].Split('.')[0];
+                        HashSet<int> favlist = new();
+                        if (info.Count > 8)
+                        {
+                            for (int a = 8; a < info.Count; a++)
+                            {
+                                if (info[a].Contains("★"))
+                                    info[a] = info[a].Replace("★", "");
+                                favlist.Add(int.Parse(info[a]));
+                            }
+                        }
+
+                        HashSet<TradeExtensions.Catch> catches = new();
+                        HashSet<int> dex = new();
+                        foreach (var file in Directory.GetFiles($"TradeCord\\{userid}"))
+                        {
+                            var basestring = file.Split('\\')[2].Split('.')[0];
+                            if (basestring.Contains("★"))
+                                basestring = basestring.Replace("★", "");
+
+                            var id = int.Parse(basestring.Contains("_") ? basestring.Split('_')[0] : basestring.Split(' ')[0]);
+                            var pkm = PKMConverter.GetPKMfromBytes(File.ReadAllBytes(file));
+                            if (pkm == null)
+                                pkm = PKMConverter.GetBlank(typeof(PK8));
+
+                            if (!dex.Contains(pkm.Species))
+                                dex.Add(pkm.Species);
+
+                            var form = TradeExtensions.FormOutput(pkm.Species, pkm.Form, out _);
+                            catches.Add(new TradeExtensions.Catch { ID = id, Ball = $"{(Ball)pkm.Ball}", Egg = pkm.IsEgg, Form = form, Shiny = pkm.IsShiny, Species = $"{SpeciesName.GetSpeciesNameGeneration(pkm.Species, 2, 8)}", Path = file, Traded = false });
+                            if (dc1 && id1 == id)
+                                dcPkm1 = new TradeExtensions.Daycare1 { Ball = pkm.Ball, Form = TradeExtensions.FormOutput(pkm.Species, pkm.Form, out _), Species = pkm.Species, Shiny = pkm.IsShiny, ID = id1 };
+                            else if (dc2 && id2 == id)
+                                dcPkm2 = new TradeExtensions.Daycare2 { Ball = pkm.Ball, Form = TradeExtensions.FormOutput(pkm.Species, pkm.Form, out _), Species = pkm.Species, Shiny = pkm.IsShiny, ID = id2 };
+                        }
+
+                        jobject.Users.Add(new TradeExtensions.TCUserInfo
+                        {
+                            UserID = ulong.Parse(userid),
+                            CatchCount = int.TryParse(info[0], out int count) ? count : 0,
+                            Daycare1 = dc1 ? dcPkm1 : new TradeExtensions.Daycare1 { },
+                            Daycare2 = dc2 ? dcPkm2 : new TradeExtensions.Daycare2 { },
+                            OTName = int.TryParse(info[3], out _) ? "" : info[3],
+                            OTGender = int.TryParse(info[4], out _) ? "" : info[4],
+                            TID = int.TryParse(info[5], out int tid) ? tid : 0,
+                            SID = int.TryParse(info[6], out int sid) ? sid : 0,
+                            Language = int.TryParse(info[7], out _) ? "" : info[7],
+                            Dex = dex,
+                            Favorites = favlist,
+                            Catches = catches
+                        });
+
+                        TradeExtensions.SerializeInfo(jobject, InfoPath);
+                        File.Move(files[i], $"TradeCord\\Backup\\{userid}.txt");
+                    }
+                    catch (Exception ex)
+                    {
+                        Base.EchoUtil.Echo(ex.Message + "\n" + ex.StackTrace + "\n" + ex.InnerException);
+                    }
                 }
-            }
-            else return user;
-        }
-
-        private TradeExtensions.TCUserInfoRoot GetUserRoot()
-        {
-            JsonSerializer serializer = new();
-            using TextReader reader = File.OpenText("TradeCord\\UserInfo.json");
-            TradeExtensions.TCUserInfoRoot? root = (TradeExtensions.TCUserInfoRoot?)serializer.Deserialize(reader, typeof(TradeExtensions.TCUserInfoRoot));
-            reader.Close();
-            return root ?? new TradeExtensions.TCUserInfoRoot();
-        }
-
-        private void UpdateUserInfo(TradeExtensions.TCUserInfo info)
-        {
-            JsonSerializer serializer = new();
-            using TextReader reader = File.OpenText("TradeCord\\UserInfo.json");
-            var root = GetUserRoot();
-            reader.Close();
-            if (info != null && root != null)
-            {
-                var userIndex = root.Users.FindIndex(0, x => x.UserID == info.UserID);
-                root.Users[userIndex] = info;
-                using StreamWriter writer = File.CreateText("TradeCord\\UserInfo.json");
-                serializer.Formatting = Formatting.Indented;
-                serializer.Serialize(writer, root);
             }
         }
 
