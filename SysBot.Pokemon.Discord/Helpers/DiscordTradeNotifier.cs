@@ -45,11 +45,7 @@ namespace SysBot.Pokemon.Discord
             OnFinish?.Invoke(routine);
             Trader.SendMessageAsync($"Trade canceled: {msg}").ConfigureAwait(false);
             if (info.Type == PokeTradeType.TradeCord)
-            {
-                var user = Trader.Id.ToString();
-                var path = TradeExtensions.TradeCordPath.FirstOrDefault(x => x.Contains(user));
-                TradeExtensions.TradeCordPath.Remove(path);
-            }
+                TradeExtensions.TradeStatusUpdate(Trader.Id.ToString());
         }
 
         public void TradeFinished(PokeRoutineExecutor routine, PokeTradeDetail<T> info, T result)
@@ -62,14 +58,7 @@ namespace SysBot.Pokemon.Discord
                 Trader.SendPKMAsync(result, "Here's what you traded me!").ConfigureAwait(false);
 
             if (info.Type == PokeTradeType.TradeCord)
-            {
-                var user = Trader.Id.ToString();
-                var origPath = TradeExtensions.TradeCordPath.FirstOrDefault(x => x.Contains(user));
-                var tradedPath = System.IO.Path.Combine($"TradeCord\\Backup\\{user}", origPath.Split('\\')[2]);
-                try { System.IO.File.Move(origPath, tradedPath); }
-                catch (System.IO.IOException) { System.IO.File.Move(origPath, tradedPath.Insert(tradedPath.IndexOf(".") - 1, "_ex")); }
-                TradeExtensions.TradeCordPath.Remove(origPath);
-            }
+                TradeExtensions.TradeStatusUpdate(Trader.Id.ToString());
         }
 
         public void SendNotification(PokeRoutineExecutor routine, PokeTradeDetail<T> info, string message)

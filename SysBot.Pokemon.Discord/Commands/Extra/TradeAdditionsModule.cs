@@ -1,7 +1,7 @@
-using Discord;
-using Discord.Commands;
-using Discord.Rest;
 using PKHeX.Core;
+using Discord;
+using Discord.Rest;
+using Discord.Commands;
 using System;
 using System.IO;
 using System.Linq;
@@ -1016,14 +1016,14 @@ namespace SysBot.Pokemon.Discord
 
             TCInfo = TradeExtensions.GetUserInfo(Context.User.Id, InfoPath);
             var traded = TCInfo.Catches.ToList().FindAll(x => x.Traded);
-            if (traded != default && TradeExtensions.TradeCordPath.FirstOrDefault(x => x.Contains(TCInfo.UserID.ToString())) == default)
+            var tradeSignal = TradeExtensions.TradeCordPath.FirstOrDefault(x => x.Contains(TCInfo.UserID.ToString()));
+            if (traded.Count != 0 && tradeSignal == default)
             {
                 foreach (var trade in traded)
                 {
-                    var tradedPath = Path.Combine($"TradeCord\\Backup\\{TCInfo.UserID}", trade.Path.Split('\\')[2]);
-                    if (!File.Exists(tradedPath))
-                        trade.Traded = false;
-                    else TCInfo.Catches.Remove(trade);
+                    if (!File.Exists(trade.Path))
+                        TCInfo.Catches.Remove(trade);
+                    else trade.Traded = false;
                 }
                 TradeExtensions.UpdateUserInfo(TCInfo, InfoPath);
             }

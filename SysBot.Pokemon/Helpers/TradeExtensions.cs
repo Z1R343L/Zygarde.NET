@@ -1,4 +1,4 @@
-﻿using PKHeX.Core;
+using PKHeX.Core;
 using PKHeX.Core.AutoMod;
 using Newtonsoft.Json;
 using System;
@@ -465,7 +465,7 @@ namespace SysBot.Pokemon
         public static PKM LegalityAttempt(PKM pkm)
         {
             var la = new LegalityAnalysis(pkm);
-            if (!la.Valid)
+            if (!la.Valid && pkm.Version != (int)GameVersion.GO)
             {
                 var list = la.Results.ToList().FindAll(x => x.Judgement == Severity.Invalid);
                 foreach (var invalid in list)
@@ -475,13 +475,16 @@ namespace SysBot.Pokemon
                         case CheckIdentifier.GameOrigin: _ = pkm.Version == pkm.MinGameID ? pkm.Version += 1 : pkm.Version -= 1; break;
                         case CheckIdentifier.Form: pkm.HeldItem = pkm.Species == (int)Species.Giratina && pkm.Form == 1 ? pkm.HeldItem = 112 : pkm.HeldItem; break;
                         case CheckIdentifier.Nickname: CommonEdits.SetDefaultNickname(pkm, la); break;
-                        case CheckIdentifier.Memory: pkm.CurrentHandler = pkm.CurrentHandler == 0 ? pkm.CurrentHandler = 1 : pkm.CurrentHandler = 0; pkm.SetHandlerandMemory(AutoLegalityWrapper.GetTrainerInfo(8)); break;
+                        case CheckIdentifier.Memory: pkm.CurrentHandler = pkm.CurrentHandler == 0 ? pkm.CurrentHandler = 1 : pkm.CurrentHandler = 0; pkm.SetHandlerandMemory(AutoLegalityWrapper.GetTrainerInfo(8)); pkm.SetFriendship(la.EncounterMatch); break;
                         case CheckIdentifier.Ability: pkm.AbilityNumber = pkm.AbilityNumber == 4 ? pkm.AbilityNumber = 1 : pkm.AbilityNumber; pkm.RefreshAbility(pkm.AbilityNumber); break;
                         case CheckIdentifier.Language: pkm.Language = pkm.Language == 0 ? 2 : pkm.Language == 2 ? 1 : pkm.Language; pkm.ClearNickname(); break;
                         case CheckIdentifier.Shiny: _ = pkm.ShinyXor == 0 ? CommonEdits.SetShiny(pkm, Shiny.AlwaysStar) : pkm.ShinyXor <= 16 ? CommonEdits.SetShiny(pkm, Shiny.AlwaysSquare) : CommonEdits.SetShiny(pkm, Shiny.Never); break;
                     };
                 }
             }
+            else if (pkm.Version == (int)GameVersion.GO && !la.Valid)
+                pkm = pkm.Legalize();
+
             pkm = TrashBytes(pkm, la);
             pkm.RefreshChecksum();
             return pkm;
@@ -557,6 +560,30 @@ namespace SysBot.Pokemon
             using StreamWriter writer = File.CreateText(filePath);
             serializer.Formatting = Formatting.Indented;
             serializer.Serialize(writer, root);
+        }
+
+        public static void TradeStatusUpdate(string id, bool cancelled = false)
+        {
+            if (!cancelled)
+            {
+                var origPath = TradeCordPath.FirstOrDefault(x => x.Contains(id));
+                var tradedPath = Path.Combine($"TradeCord\\Backup\\{id}", origPath.Split('\\')[2]);
+                try
+                {
+                    File.Move(origPath, tradedPath);
+                }
+                catch (IOException)
+                {
+                    File.Move(origPath, tradedPath.Insert(tradedPath.IndexOf(".") - 1, "ex"));
+                }
+            }
+
+            var entries = TradeCordPath.FindAll(x => x.Contains(id));
+            if (entries.Count > 0)
+            {
+                foreach (var entry in entries)
+                    TradeCordPath.Remove(entry);
+            }
         }
     }
 }
