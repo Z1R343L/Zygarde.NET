@@ -110,7 +110,7 @@ namespace SysBot.Pokemon.Discord
         {
             var code = Info.GetRandomTradeCode();
             var sig = Context.User.GetFavor();
-            await Context.AddToQueueAsync(code, Context.User.Username, sig, new PK8(), PokeRoutineType.FixOT, PokeTradeType.FixOT).ConfigureAwait(false);
+            await Context.AddToQueueAsync(code, Context.User.Username, sig, new PK8(), PokeRoutineType.FlexTrade, PokeTradeType.FixOT).ConfigureAwait(false);
         }
 
         [Command("fixOT")]
@@ -120,41 +120,7 @@ namespace SysBot.Pokemon.Discord
         public async Task FixAdOT([Summary("Trade Code")] int code)
         {
             var sig = Context.User.GetFavor();
-            await Context.AddToQueueAsync(code, Context.User.Username, sig, new PK8(), PokeRoutineType.FixOT, PokeTradeType.FixOT).ConfigureAwait(false);
-        }
-
-        [Command("fixOTList")]
-        [Alias("fl", "fq")]
-        [Summary("Prints the users in the FixOT queue.")]
-        [RequireSudo]
-        public async Task GetFixListAsync()
-        {
-            string msg = Info.GetTradeList(PokeRoutineType.FixOT);
-            var embed = new EmbedBuilder();
-            embed.AddField(x =>
-            {
-                x.Name = "Pending Trades";
-                x.Value = msg;
-                x.IsInline = false;
-            });
-            await ReplyAsync("These are the users who are currently waiting:", embed: embed.Build()).ConfigureAwait(false);
-        }
-
-        [Command("TradeCordList")]
-        [Alias("tcl", "tcq")]
-        [Summary("Prints users in the TradeCord queue.")]
-        [RequireSudo]
-        public async Task GetTradeCordListAsync()
-        {
-            string msg = Info.GetTradeList(PokeRoutineType.TradeCord);
-            var embed = new EmbedBuilder();
-            embed.AddField(x =>
-            {
-                x.Name = "Pending TradeCord Trades";
-                x.Value = msg;
-                x.IsInline = false;
-            });
-            await ReplyAsync("These are the users who are currently waiting:", embed: embed.Build()).ConfigureAwait(false);
+            await Context.AddToQueueAsync(code, Context.User.Username, sig, new PK8(), PokeRoutineType.FlexTrade, PokeTradeType.FixOT).ConfigureAwait(false);
         }
 
         [Command("TradeCordCatch")]
@@ -221,7 +187,10 @@ namespace SysBot.Pokemon.Discord
                 bool melmetalHack = TCRng.SpeciesRNG == (int)Species.Melmetal && TCRng.GmaxRNG >= 100 - Info.Hub.Config.TradeCord.GmaxRate;
                 if ((TradeExtensions.CherishOnly.Contains(TCRng.SpeciesRNG) || TCRng.CherishRng >= 100 - Info.Hub.Config.TradeCord.CherishRate || MGRngEvent != default || melmetalHack) && mgRng != default)
                 {
-                    TCRng.CatchPKM = TradeExtensions.CherishHandler(mgRng);
+                    Enum.TryParse(TCInfo.OTGender, out Gender gender);
+                    Enum.TryParse(TCInfo.Language, out LanguageID language);
+                    var info = !trainerInfo.Contains("") ? new SimpleTrainerInfo { Gender = (int)gender, Language = (int)language, OT = TCInfo.OTName, TID = TCInfo.TID, SID = TCInfo.SID } : AutoLegalityWrapper.GetTrainerInfo(8);
+                    TCRng.CatchPKM = TradeExtensions.CherishHandler(mgRng, info);
                     TradeExtensions.LegalityAttempt(TCRng.CatchPKM);
                 }
                 else
@@ -288,7 +257,7 @@ namespace SysBot.Pokemon.Discord
             TradeExtensions.TradeCordPath.Add(match.Path);
             TradeExtensions.UpdateUserInfo(TCInfo, InfoPath);
             var sig = Context.User.GetFavor();
-            await Context.AddToQueueAsync(code, Context.User.Username, sig, (PK8)pkm, PokeRoutineType.TradeCord, PokeTradeType.TradeCord).ConfigureAwait(false);
+            await Context.AddToQueueAsync(code, Context.User.Username, sig, (PK8)pkm, PokeRoutineType.FlexTrade, PokeTradeType.TradeCord).ConfigureAwait(false);
         }
 
         [Command("TradeCord")]
@@ -606,7 +575,7 @@ namespace SysBot.Pokemon.Discord
                 }
 
                 Enum.TryParse(match.Ball, out Ball ball);
-                Enum.TryParse(match.Species, out Species species);
+                Enum.TryParse(string.Join("", match.Species.Split('-', ' ', '’')), out Species species);
                 if ((TCInfo.Daycare1.ID == 0 && TCInfo.Daycare2.ID == 0) || (TCInfo.Daycare1.ID == 0 && TCInfo.Daycare2.ID != int.Parse(id)))
                     TCInfo.Daycare1 = new TradeExtensions.Daycare1 { Ball = (int)ball, Form = match.Form, ID = match.ID, Shiny = match.Shiny, Species = (int)species };
                 else if (TCInfo.Daycare2.ID == 0 && TCInfo.Daycare1.ID != int.Parse(id))
@@ -1196,12 +1165,12 @@ namespace SysBot.Pokemon.Discord
             {
                 if (pkm.Gender == 0)
                     md = true;
-                else md = true;
+                else fd = true;
             }
 
             baseLink[2] = pkm.Species < 10 ? $"000{pkm.Species}" : pkm.Species < 100 && pkm.Species > 9 ? $"00{pkm.Species}" : $"0{pkm.Species}";
             baseLink[3] = pkm.Form < 10 ? $"00{pkm.Form}" : $"0{pkm.Form}";
-            baseLink[4] = pkm.PersonalInfo.OnlyFemale ? "fo" : pkm.PersonalInfo.OnlyMale ? "mo" : pkm.PersonalInfo.Genderless ? "uk" : md ? "fd" : md ? "md" : "mf";
+            baseLink[4] = pkm.PersonalInfo.OnlyFemale ? "fo" : pkm.PersonalInfo.OnlyMale ? "mo" : pkm.PersonalInfo.Genderless ? "uk" : fd ? "fd" : md ? "md" : "mf";
             baseLink[5] = canGmax ? "g" : "n";
             baseLink[6] = "0000000" + (pkm.Species == (int)Species.Alcremie ? alcremieDeco : 0);
             baseLink[8] = pkm.IsShiny ? "r.png" : "n.png";
@@ -1242,7 +1211,6 @@ namespace SysBot.Pokemon.Discord
                     (int)Species.Pikachu => _ = formEdgeCaseRng == 1 ? "" : TradeExtensions.PartnerPikachuHeadache[TradeExtensions.Random.Next(TradeExtensions.PartnerPikachuHeadache.Length)],
                     (int)Species.Dracovish or (int)Species.Dracozolt => _ = formEdgeCaseRng == 1 ? "" : "\nAbility: Sand Rush",
                     (int)Species.Arctovish or (int)Species.Arctozolt => _ = formEdgeCaseRng == 1 ? "" : "\nAbility: Slush Rush",
-                    (int)Species.Landorus or (int)Species.Thundurus or (int)Species.Tornadus => _ = formEdgeCaseRng == 1 ? "" : "Therian\nAbility: Intimidate",
                     (int)Species.Zygarde => forms[TradeExtensions.Random.Next(forms.Length - 1)],
                     _ => EventPokeType == "" ? forms[TradeExtensions.Random.Next(forms.Length)] : EventPokeType == "Base" ? "" : forms[int.Parse(EventPokeType)],
                 };
