@@ -1160,6 +1160,7 @@ namespace SysBot.Pokemon.Discord
         private string PokeImg(PKM pkm, bool canGmax, uint alcremieDeco)
         {
             bool md = false;
+            bool fd = false;
             var baseLink = Links.tc_Baseurl().Split('_');
             if (TradeExtensions.GenderDependent.Contains(pkm.Species) && !canGmax && pkm.Form == 0)
             {
